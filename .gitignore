@@ -1,0 +1,9 @@
+target/
+tools/ocio/
+tools/preview/
+tools/cache/
+__pycache__/
+*.pyc
+*.blend1
+# ungenutzte Fremd-Assets (Blender Human Base Meshes), nicht Teil des Spiels
+third_party/

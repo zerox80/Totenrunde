@@ -1,0 +1,24 @@
+[package]
+name = "totenrunde"
+version = "0.1.0"
+edition = "2024"
+default-run = "totenrunde"
+
+[dependencies]
+bevy = { version = "0.20.0", default-features = false, features = ["3d", "ui", "audio", "wav", "png", "jpeg"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rand = "0.9"
+
+[features]
+dynamic = ["bevy/dynamic_linking"]
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+codegen-units = 1
+lto = "thin"

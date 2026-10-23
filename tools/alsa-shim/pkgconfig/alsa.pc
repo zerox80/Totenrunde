@@ -1,0 +1,10 @@
+# Laufzeit-Shim: erlaubt das Linken gegen die installierte libasound.so.2,
+# ohne dass das Paket alsa-lib-devel installiert sein muss.
+# Mit `sudo dnf install alsa-lib-devel` wird dieser Shim überflüssig.
+libdir=${pcfiledir}/../lib
+
+Name: alsa
+Description: ALSA runtime shim (keine Header, nur Linker-Angaben)
+Version: 1.2.14
+Libs: -L${libdir} -lasound
+Cflags:
