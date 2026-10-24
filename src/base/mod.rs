@@ -2,6 +2,7 @@
 
 pub mod assets;
 pub mod debug;
+pub mod platform;
 pub mod settings;
 pub mod state;
 pub mod textures;
@@ -21,6 +22,7 @@ impl Plugin for BasePlugin {
                 Update,
                 (GameSet::Input, GameSet::Movement, GameSet::Combat, GameSet::World, GameSet::Ui).chain(),
             )
-            .add_plugins((assets::AssetsPlugin, debug::DebugPlugin, state::StatePlugin, textures::TexturePlugin));
+            .add_plugins((assets::AssetsPlugin, debug::DebugPlugin, state::StatePlugin, textures::TexturePlugin))
+            .add_systems(Update, platform::set_window_icon);
     }
 }

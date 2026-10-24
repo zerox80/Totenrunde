@@ -1,0 +1,50 @@
+TOTENRUNDE
+==========
+
+Rundenbasierter Zombie-Überlebensmodus im Stil von Black Ops 2.
+Karte „Endstation“: ein verlassener Busbahnhof bei Nacht.
+
+
+STARTEN
+-------
+Windows:  Totenrunde.exe doppelklicken.
+          Zeigt Windows „Der Computer wurde durch Windows geschützt“ (das Spiel ist nicht
+          signiert), auf „Weitere Informationen“ und dann „Trotzdem ausführen“ klicken.
+
+Linux:    Totenrunde doppelklicken (oder im Terminal: ./Totenrunde).
+          Optional legt ./desktop-eintrag.sh einen Eintrag im Startmenü an.
+
+Wichtig:  Das Archiv vollständig entpacken. Neben Totenrunde muss der Ordner „assets“ liegen.
+
+
+SYSTEM
+------
+64-Bit Windows 10/11 oder Linux, Grafikkarte mit Vulkan oder DirectX 12, 4 GB RAM.
+Unter Linux werden aktuelle Mesa- bzw. NVIDIA-Treiber mit Vulkan benötigt.
+
+
+STEUERUNG
+---------
+WASD             laufen              Maus           zielen
+Linksklick       schießen            Rechtsklick    über Kimme und Korn
+R                nachladen           V              Messer
+G                Granate             F              benutzen (kaufen, Türen, Barrikaden)
+Shift            sprinten            Leertaste      springen
+C                ducken              Strg / Z       hinlegen
+1–3 / Mausrad / Q  Waffe wechseln    Esc            Pause
+F3               FPS-Anzeige
+
+
+GRAFIK
+------
+Im Haupt- oder Pausenmenü unter GRAFIK: Stufen Niedrig / Mittel / Hoch / Extrem oder
+einzelne Einstellungen. Ruckelt es, eine Stufe niedriger wählen. Die Einstellungen werden
+in settings.json neben dem Spiel gespeichert.
+
+
+PROBLEME
+--------
+Stürzt das Spiel ab, erscheint eine Meldung, und die Details stehen in
+totenrunde-absturz.txt neben dem Spiel.
+
+Quellcode und Neuigkeiten: https://github.com/zerox80/Totenrunde

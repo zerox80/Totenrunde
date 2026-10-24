@@ -8,3 +8,4 @@ __pycache__/
 # ungenutzte Fremd-Assets (Blender Human Base Meshes), nicht Teil des Spiels
 third_party/
 settings.json
+dist/

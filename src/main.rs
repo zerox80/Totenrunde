@@ -14,6 +14,9 @@
 //! Alle 3D-Modelle, Texturen und HUD-Grafiken erzeugen die Blender-Skripte in `blender/`,
 //! alle Geräusche der Synthesizer `src/bin/sfxgen`.
 
+// Release unter Windows: kein Konsolenfenster beim Start per Doppelklick
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod audio;
 mod base;
 mod fx;
@@ -28,12 +31,18 @@ use bevy::prelude::*;
 use bevy::window::{PresentMode, WindowResolution};
 
 fn main() {
+    base::platform::install_crash_handler();
+    if !base::platform::check_assets() {
+        return;
+    }
     App::new()
         .add_plugins(
             DefaultPlugins
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: "Totenrunde".into(),
+                        // Wayland-App-ID bzw. X11-WM_CLASS (passend zum Desktop-Eintrag)
+                        name: Some("totenrunde".into()),
                         resolution: WindowResolution::new(1600, 900),
                         present_mode: PresentMode::AutoVsync,
                         ..default()

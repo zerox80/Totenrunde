@@ -5,12 +5,14 @@
   * blood_overlay.png    – Blutspritzer am Bildschirmrand (Schaden)
   * points_bar.png       – dunkler, abgeschrägter Balken hinter den Punkten
   * grenade.png          – Granaten-Symbol
+  * icon.png             – Spiel-Icon (rote Kreide-Strichliste), dazu packaging/totenrunde.ico
 
-Aufruf: tools/blender.sh blender/ui/hud_textures.py
+Aufruf: tools/blender.sh blender/ui/hud_textures.py [-- icon]   (icon: nur das Icon)
 """
 
 import math
 import os
+import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -220,14 +222,88 @@ def grenade():
     write_png(os.path.join(UI_DIR, "grenade.png"), rgba)
 
 
+def icon():
+    """Spiel-Icon: rote Kreide-Strichliste (Runde 5) auf dunkler, abgerundeter Tafel."""
+    n = 512
+    cv = Canvas(n, seed=51)
+    ys, xs = np.mgrid[0:n, 0:n].astype(np.float32) + 0.5
+    # abgerundetes Quadrat
+    r, m = 92.0, 10.0
+    qx = np.maximum(np.abs(xs - n / 2) - (n / 2 - m - r), 0)
+    qy = np.maximum(np.abs(ys - n / 2) - (n / 2 - m - r), 0)
+    plate = smooth(r - np.sqrt(qx * qx + qy * qy), -1.0, 1.0)
+    # Tafel: dunkler Schiefer mit Schlieren, Mitte etwas heller, roter Schimmer
+    d = np.sqrt((xs - n / 2) ** 2 + (ys - n / 2) ** 2) / (n / 2)
+    slate = cv.noise(6, 52, octaves=5) * 0.6 + cv.noise(40, 53, octaves=3) * 0.4
+    smear = cv.noise(4, 54, octaves=3, aniso=(1.0, 0.3))
+    base = (0.030 + 0.022 * slate + 0.012 * smear) * (1.25 - 0.55 * d)
+    col = np.zeros((n, n, 4), np.float32)
+    col[..., 0] = base * 1.05 + 0.05 * smooth(1.0 - d, 0.2, 1.0)
+    col[..., 1] = base * 0.95
+    col[..., 2] = base * 0.92
+    # Strichliste
+    rng = np.random.default_rng(55)
+    img = np.zeros((n, n), np.float32)
+    for i in range(4):
+        x = 128 + i * 82 + rng.uniform(-5, 5)
+        img = stroke(img, x + rng.uniform(-8, 8), 96 + rng.uniform(-6, 6), x + rng.uniform(-12, 4), 416 + rng.uniform(-6, 6), 22.0, rng)
+    img = stroke(img, 72, 350, 444, 160, 22.0, rng)
+    chalk = chalkify(img, 56)
+    red = np.array([0.62, 0.035, 0.02], np.float32)
+    col[..., :3] = col[..., :3] * (1 - chalk[..., None]) + red * chalk[..., None] * (0.85 + 0.3 * cv.noise(90, 57)[..., None])
+    # schmaler heller Rand der Tafel
+    rim = smooth(r - np.sqrt(qx * qx + qy * qy), -1.0, 1.0) - smooth(r - 7 - np.sqrt(qx * qx + qy * qy), -1.0, 1.0)
+    col[..., :3] += rim[..., None] * 0.05
+    col[..., 3] = plate
+
+    def down(img, size):
+        """Flächenmittel auf size×size (vormultipliziertes Alpha)."""
+        sc = n / size
+        M = np.zeros((size, n), np.float32)
+        for i in range(size):
+            a, b = i * sc, (i + 1) * sc
+            for j in range(int(a), min(int(math.ceil(b)), n)):
+                M[i, j] = (min(b, j + 1) - max(a, j)) / sc
+        pre = img.copy()
+        pre[..., :3] *= pre[..., 3:4]
+        out = np.stack([M @ pre[..., c] @ M.T for c in range(4)], axis=-1)
+        out[..., :3] /= np.maximum(out[..., 3:4], 1e-6)
+        return out
+
+    write_png(os.path.join(UI_DIR, "icon.png"), down(col, 256), srgb=True)
+    # .ico mit PNG-Einträgen (Windows-Programmsymbol)
+    pkg = os.path.join(os.path.dirname(ASSETS), "packaging")
+    os.makedirs(pkg, exist_ok=True)
+    tmp = os.path.join(pkg, "_icon.png")
+    pngs = []
+    for size in (256, 128, 64, 48, 32, 24, 16):
+        write_png(tmp, down(col, size), srgb=True)
+        with open(tmp, "rb") as f:
+            pngs.append((size, f.read()))
+    os.remove(tmp)
+    head = struct.pack("<HHH", 0, 1, len(pngs))
+    off = 6 + 16 * len(pngs)
+    entries, data = b"", b""
+    for size, png in pngs:
+        entries += struct.pack("<BBBBHHII", size % 256, size % 256, 0, 0, 1, 32, len(png), off + len(data))
+        data += png
+    with open(os.path.join(pkg, "totenrunde.ico"), "wb") as f:
+        f.write(head + entries + data)
+
+
 def main():
     reset_scene()
     os.makedirs(UI_DIR, exist_ok=True)
+    if "icon" in sys.argv:
+        icon()
+        print("Icon fertig")
+        return
     digits()
     tallies()
     blood_overlay()
     points_bar()
     grenade()
+    icon()
     print("HUD-Grafiken fertig")
 
 

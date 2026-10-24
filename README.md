@@ -16,7 +16,14 @@ Alle Inhalte sind selbst erzeugt. Es gibt keine gekauften oder heruntergeladenen
   Echtzeit-Lichter, statische Schatten und indirektes Licht sind gebacken.
 - **Geräusche und Musik** sind synthetisiert (`src/bin/sfxgen`), der Ansager nutzt espeak-ng.
 
-## Spielen
+## Herunterladen
+
+Fertige Pakete für **Windows** und **Linux** gibt es unter
+[Releases](https://github.com/zerox80/Totenrunde/releases/latest): Archiv entpacken, dann
+`Totenrunde.exe` (Windows) bzw. `Totenrunde` (Linux) doppelklicken. Der Ordner `assets` muss neben
+der Programmdatei liegen. Benötigt wird eine Grafikkarte mit Vulkan oder DirectX 12.
+
+## Selbst bauen und spielen
 
 ```bash
 cargo run --release
@@ -67,6 +74,18 @@ cargo run --release --bin sfxgen                        # Geräusche und Musik
 ```
 
 Bei Karte und Waffen beschleunigt `-- nobake` den Durchlauf (ohne Lightmaps bzw. Texturen).
+
+## Release erstellen
+
+Ein Tag `v*` startet den Workflow `.github/workflows/release.yml`. Er baut auf GitHub für Windows und
+Linux, packt Programm, `assets`, `LIESMICH.txt` und Lizenz zusammen und veröffentlicht das Release:
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+Das Programmsymbol (`assets/ui/icon.png`, `packaging/totenrunde.ico`) erzeugt
+`tools/blender.sh blender/ui/hud_textures.py -- icon`.
 
 ## Lizenz
 

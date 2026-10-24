@@ -1,0 +1,111 @@
+# Baut Totenrunde für Windows und Linux und veröffentlicht beide Pakete als GitHub-Release.
+# Auslöser: ein Tag wie v0.1.0 (git tag v0.1.0 && git push origin v0.1.0).
+# Manuell gestartet (workflow_dispatch) entstehen nur die Pakete als Artefakte.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  VERSION: ${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Ubuntu 22.04: ältere glibc, läuft dadurch auf fast allen aktuellen Distributionen
+          - name: linux-x64
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - name: windows-x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Linux-Bibliotheken
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pkg-config libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+
+      - name: Bauen
+        shell: bash
+        run: |
+          # Linux: kein PIE, damit Dateimanager das Programm per Doppelklick starten
+          # (PIE-Programme gelten bei manchen als „Bibliothek“)
+          if [ "$RUNNER_OS" = "Linux" ]; then export RUSTFLAGS="-C relocation-model=static"; fi
+          cargo build --release --locked --bin totenrunde --target ${{ matrix.target }}
+
+      - name: Paket (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          d=dist/Totenrunde
+          mkdir -p $d
+          cp target/${{ matrix.target }}/release/totenrunde $d/Totenrunde
+          cp -r assets $d/
+          cp LICENSE packaging/LIESMICH.txt packaging/desktop-eintrag.sh $d/
+          chmod +x $d/Totenrunde $d/desktop-eintrag.sh
+          file $d/Totenrunde
+          tar -C dist -czf "Totenrunde-$VERSION-${{ matrix.name }}.tar.gz" Totenrunde
+          ls -la Totenrunde-*
+
+      - name: Paket (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $d = "dist/Totenrunde"
+          New-Item -ItemType Directory -Force $d | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/totenrunde.exe" "$d/Totenrunde.exe"
+          Copy-Item -Recurse assets "$d/assets"
+          Copy-Item LICENSE "$d/LICENSE.txt"
+          Copy-Item packaging/LIESMICH.txt "$d/"
+          Push-Location dist
+          7z a -tzip -mx=5 "../Totenrunde-$env:VERSION-${{ matrix.name }}.zip" Totenrunde
+          Pop-Location
+          Get-ChildItem Totenrunde-*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: Totenrunde-*
+          compression-level: 0
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Release veröffentlichen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la dist
+          gh release create "$VERSION" dist/* --title "Totenrunde $VERSION" --notes-file packaging/release-notes.md
