@@ -1,4 +1,6 @@
-"""Backt alle Texturen nach assets/textures (Farbe + Normal-Map).
+"""Backt die Node-basierten Texturen nach assets/textures (Farbe + Normal-Map): Haut,
+Gewehrholz, Pack-a-Punch-Tarnung und Effekt-Sprites. Oberflächen, die es auch als
+PBR-Rezept gibt (textures/pbr.py, build_pbr.py), werden hier übersprungen.
 
 Aufruf: tools/blender.sh blender/textures/build.py [-- name1 name2 ...]
 """
@@ -16,6 +18,7 @@ from lib import NB, TEX_DIR, reset_scene, script_args  # noqa: E402
 from textures import sprites, surfaces  # noqa: E402,F401  (registriert die Texturen)
 from textures.baker import bake_socket, height_to_normal, linear_to_srgb, make_plane, save_png  # noqa: E402
 from textures.registry import TEXTURES  # noqa: E402
+from textures.pbr import RECIPES  # noqa: E402
 
 
 def main():
@@ -29,6 +32,8 @@ def main():
     obj = make_plane()
     for name, spec in TEXTURES.items():
         if wanted and name not in wanted:
+            continue
+        if name in RECIPES:
             continue
         t0 = time.time()
         mat = bpy.data.materials.new("bake_" + name)

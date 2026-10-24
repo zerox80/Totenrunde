@@ -70,8 +70,17 @@ fn tick_game(time: Res<Time>, mut game: ResMut<InGame>) {
     }
 }
 
-fn toggle_pause(keys: Res<ButtonInput<KeyCode>>, mut game: ResMut<InGame>, mut vtime: ResMut<Time<Virtual>>) {
+fn toggle_pause(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut game: ResMut<InGame>,
+    mut vtime: ResMut<Time<Virtual>>,
+    mut gfx: ResMut<super::settings::GraphicsMenuOpen>,
+) {
     if keys.just_pressed(KeyCode::Escape) {
+        if gfx.0 {
+            gfx.0 = false;
+            return;
+        }
         let paused = !game.paused;
         set_paused(&mut game, &mut vtime, paused);
     }

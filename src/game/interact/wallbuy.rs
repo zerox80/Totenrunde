@@ -84,6 +84,9 @@ pub fn spawn_wallbuys(
             }
         }
         // Die Waffe selbst hängt flach an der Wand (Lauf entlang der Wand)
+        if std::env::var("TR_NOWALL").is_ok() {
+            continue;
+        }
         commands
             .spawn((
                 Name::new("Wandwaffe Modell"),

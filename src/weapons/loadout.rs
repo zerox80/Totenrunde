@@ -146,9 +146,14 @@ pub fn leave_last_stand(lo: &mut Loadout) {
 /// Inventar beim Spielstart: M1911 mit Messer und 2 Granaten (wie in BO2).
 pub fn spawn_loadout(mut commands: Commands, player: Query<Entity, With<Player>>) {
     let Ok(pe) = player.single() else { return };
-    let start = weapon_index("m1911").unwrap();
+    // Für Tests: TR_WEAPON=mp5 startet mit einer anderen Waffe, TR_PAP=1 aufgewertet
+    let start = std::env::var("TR_WEAPON")
+        .ok()
+        .and_then(|w| weapon_index(&w))
+        .unwrap_or_else(|| weapon_index("m1911").unwrap());
+    let upgraded = std::env::var("TR_PAP").is_ok();
     commands.entity(pe).insert(Loadout {
-        slots: vec![WeaponSlot::new(start, false)],
+        slots: vec![WeaponSlot::new(start, upgraded)],
         current: 0,
         state: WState::Raising { t: 0.0 },
         fire_cd: 0.0,

@@ -10,6 +10,9 @@
 //! * `TR_POWER=1` – Strom ist von Anfang an eingeschaltet
 //! * `TR_MENUSHOT=/pfad/menu.png` – Screenshot des Hauptmenüs nach 1,5 s
 //! * `TR_MENUPLAY=1` – im Hauptmenü nach 3 s "Spielen" drücken (Enter)
+//! * `TR_GFXMENU=1` – Grafik-Menü beim Start öffnen
+//! * `TR_WEAPON=mp5`, `TR_PAP=1` – mit dieser (aufgewerteten) Waffe starten
+//! * Leistungstests: `TR_TEXMAX=512`, `TR_MSAA=0`, `TR_SHADOWS=1`, `TR_NOLIGHTS=1`, `TR_NOWALL=1`
 
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{save_to_disk, Screenshot};
@@ -194,6 +197,7 @@ fn timed_actions(
     mut cfg: ResMut<DebugConfig>,
     ingame: Option<Res<InGame>>,
     mut exit: MessageWriter<AppExit>,
+    mut fps: Local<(u32, f32)>,
 ) {
     if !cfg.active || ingame.is_none() {
         return;
@@ -201,6 +205,11 @@ fn timed_actions(
     let before = cfg.elapsed;
     cfg.elapsed += time.delta_secs();
     let now = cfg.elapsed;
+    // Durchschnittliche Bildrate ab Sekunde 10 (nach Laden und Mipmaps), Ausgabe beim Beenden
+    if now > 10.0 {
+        fps.0 += 1;
+        fps.1 += time.delta_secs();
+    }
     let shots: Vec<String> = cfg
         .shots
         .iter()
@@ -213,6 +222,9 @@ fn timed_actions(
     }
     if let Some(t) = cfg.exit_at {
         if now >= t {
+            if fps.1 > 0.0 {
+                info!("FPS-Mittel: {:.1}", fps.0 as f32 / fps.1);
+            }
             exit.write(AppExit::Success);
         }
     }

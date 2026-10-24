@@ -66,6 +66,7 @@ class MapBuilder:
         self.fires = []
         self.decor = []  # zusätzliche Modelle (z. B. Requisiten), die das Spiel lädt
         self.objects = []  # eigenständige Blender-Objekte (Türen usw.)
+        self.occluders = []  # nur beim Backen vorhanden (z. B. Automaten, die das Spiel lädt)
         self.player_start = None
         self.nav = None
         self.extra = {}
@@ -112,14 +113,16 @@ class MapBuilder:
             else:
                 self.collider(center, (r * 2, h, r * 2), 0.0, flags)
 
-    def floor(self, x0, y0, x1, y1, mat, z=0.0, t=0.1, collide=False, uv_rot=0.0):
-        self.box_mm((x0, y0, z - t), (x1, y1, z), mat, collide=collide, uv_rot=uv_rot)
+    def floor(self, x0, y0, x1, y1, mat, z=0.0, t=0.1, collide=False, uv_rot=0.0, group="static"):
+        self.box_mm((x0, y0, z - t), (x1, y1, z), mat, collide=collide, uv_rot=uv_rot, group=group)
 
-    def wall(self, a, b, h, mat_in, mat_out, t=0.3, openings=(), inside_left=True, z0=0.0, trim=None):
+    def wall(self, a, b, h, mat_in, mat_out, t=0.3, openings=(), inside_left=True, z0=0.0, trim=None, bands=None):
         """Wand von a nach b (2D). openings: Liste von dict(s=Mitte entlang Wand, w=Breite,
         lo=Unterkante, hi=Oberkante, kind='window'|'door'|'hole', door=id).
 
         inside_left: die Innenseite liegt links der Laufrichtung a->b.
+        bands: Liste (z_von, z_bis, material, vorstehen) für die Innenseite, z. B. Sockelleiste,
+        dunkler Sockelanstrich, Abschlussleiste, Putz darüber.
         Die Wand wird aus zwei Schichten gebaut (innen/außen), damit beide Seiten
         unterschiedliche Materialien bekommen."""
         ax, ay = a
@@ -162,7 +165,13 @@ class MapBuilder:
             if s1 - s0 < 1e-3 or zhi - zlo < 1e-3:
                 continue
             # Innen- und Außenschicht (visuell), eine Kollisionsbox über die ganze Stärke
-            place(s0, s1, zlo, zhi, t / 4, t / 2, mat_in, False)
+            if bands:
+                for b0, b1, bmat, pro in bands:
+                    lo_, hi_ = max(zlo, z0 + b0), min(zhi, z0 + b1)
+                    if hi_ - lo_ > 1e-3:
+                        place(s0, s1, lo_, hi_, t / 4 + pro / 2, t / 2 + pro, bmat, False)
+            else:
+                place(s0, s1, zlo, zhi, t / 4, t / 2, mat_in, False)
             place(s0, s1, zlo, zhi, -t / 4, t / 2, mat_out, False)
             sm = (s0 + s1) / 2
             self.collider(
@@ -244,11 +253,43 @@ class MapBuilder:
         )
 
     # ------------------------------------------------------------------ Export
-    def finish(self, extra=None):
-        objs = []
+    def finish(self, extra=None, bake=True, lm_size=4096, ground_size=2048, samples=96):
+        """Erzeugt die Objekte, backt die Lightmaps und exportiert Modell + JSON."""
+        from lib import script_args
+
+        extra = extra or {}
+        objs = {}
         for (group, mat_key), b in self.builders.items():
-            obj = b.to_object(smooth_angle=30.0)
-            objs.append(obj)
+            objs[(group, mat_key)] = b.to_object(smooth_angle=30.0)
+        lightmaps = []
+        if bake and "nobake" not in script_args():
+            from maps.lightmap import bake_lightmaps
+
+            glowing = ("lamp_", "neon_")
+            main = [o for (g, k), o in objs.items() if g in ("static", "decal") and not k.startswith(glowing)]
+            ground = [o for (g, k), o in objs.items() if g == "ground"]
+            # Bewegliche Teile werfen keine gebackenen Schatten (Türen gehen auf)
+            for o in self.objects:
+                o.hide_render = True
+            for o in self.occluders:
+                o.hide_render = False
+            lightmaps = bake_lightmaps(
+                [
+                    {"name": "main", "objects": main, "size": lm_size, "image": f"lm_{self.name}_main"},
+                    {"name": "ground", "objects": ground, "size": ground_size, "image": f"lm_{self.name}_ground"},
+                ],
+                self.lights,
+                extra["sun"],
+                extra["ambient"],
+                light_scale=8.0,
+                samples=int(os.environ.get("TR_LM_SAMPLES", samples)),
+                mute_emission=("M_lamp_", "M_neon_"),
+            )
+            for o in self.objects:
+                o.hide_render = False
+            for o in self.occluders:
+                bpy.data.objects.remove(o)
+        extra["lightmaps"] = lightmaps
         model_path = os.path.join(MODEL_DIR, self.name + ".gltf")
         export_gltf(model_path)
         data = {
@@ -275,4 +316,4 @@ class MapBuilder:
         os.makedirs(MAP_DIR, exist_ok=True)
         with open(os.path.join(MAP_DIR, self.name + ".json"), "w") as f:
             json.dump(data, f, indent=1)
-        print("KARTE:", self.name, "Kollider:", len(self.colliders), "Objekte:", len(objs) + len(self.objects))
+        print("KARTE:", self.name, "Kollider:", len(self.colliders), "Objekte:", len(objs) + len(self.objects), "Lightmaps:", len(lightmaps))

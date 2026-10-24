@@ -36,6 +36,7 @@ fn spawn(mut commands: Commands, assets: Res<GameAssets>, lib: Option<Res<crate:
                 },
             ));
             button(p, "SPIELEN", MenuAction::Play, &assets.font_bold);
+            super::graphics::open_button(p, &assets.font_bold);
             button(p, "BEENDEN", MenuAction::Quit, &assets.font_bold);
             p.spawn((
                 text(
@@ -53,7 +54,18 @@ fn spawn(mut commands: Commands, assets: Res<GameAssets>, lib: Option<Res<crate:
         });
 }
 
-fn keys(keys: Res<ButtonInput<KeyCode>>, mut next: ResMut<NextState<AppState>>, mut exit: MessageWriter<AppExit>) {
+fn keys(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut next: ResMut<NextState<AppState>>,
+    mut exit: MessageWriter<AppExit>,
+    mut gfx: ResMut<crate::base::settings::GraphicsMenuOpen>,
+) {
+    if gfx.0 {
+        if keys.just_pressed(KeyCode::Escape) {
+            gfx.0 = false;
+        }
+        return;
+    }
     if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::Space) {
         next.set(AppState::Playing);
     } else if keys.just_pressed(KeyCode::Escape) {

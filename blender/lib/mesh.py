@@ -245,6 +245,26 @@ class MB:
         verts = [v for r in rings for v in r]
         return self._finish_part(self.bm, verts, faces, mat, uv, 0.0, group)
 
+    def add_mesh(self, me, matrix, mat, uv=None, group=None, keep_uv=False):
+        """Fügt ein fertiges Mesh (z. B. Schrift) mit Transformation und Material hinzu."""
+        n0 = len(self.bm.verts)
+        nf0 = len(self.bm.faces)
+        tmp = me.copy()
+        tmp.transform(matrix)
+        self.bm.from_mesh(tmp)
+        bpy.data.meshes.remove(tmp)
+        self.bm.faces.ensure_lookup_table()
+        self.bm.verts.ensure_lookup_table()
+        faces = list(self.bm.faces[nf0:])
+        idx = self.mi(mat)
+        for f in faces:
+            f.material_index = idx
+        if not keep_uv:
+            self.box_uv(faces, uv or self.uv_scale)
+        if group:
+            self.groups.setdefault(group, []).extend(list(self.bm.verts[n0:]))
+        return faces
+
     def transform_last(self, faces, matrix):
         verts = list({v for f in faces for v in f.verts})
         bmesh.ops.transform(self.bm, matrix=matrix, verts=verts)

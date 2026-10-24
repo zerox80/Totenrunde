@@ -131,6 +131,17 @@ pub struct LightSpec {
     pub flicker: f32,
     #[serde(default)]
     pub needs_power: bool,
+    /// Licht ist in die Lightmaps gebacken (wirkt dort nur noch spekular)
+    #[serde(default)]
+    pub baked: bool,
+}
+
+/// Gebackene Beleuchtung für eine Gruppe statischer Objekte (ein Atlas).
+#[derive(Deserialize, Clone, Debug)]
+pub struct LightmapSpec {
+    pub image: String,
+    pub exposure: f32,
+    pub objects: Vec<String>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -180,6 +191,8 @@ pub struct MapFile {
     pub sun: SunSpec,
     pub fog: FogSpec,
     pub ambient: AmbientSpec,
+    #[serde(default)]
+    pub lightmaps: Vec<LightmapSpec>,
 }
 
 impl MapFile {

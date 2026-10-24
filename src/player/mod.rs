@@ -36,7 +36,7 @@ impl Plugin for PlayerPlugin {
                     .run_if(in_state(AppState::Playing))
                     .run_if(resource_exists::<InGame>),
             )
-            .add_systems(Update, look::cursor_grab);
+            .add_systems(Update, (look::cursor_grab, spawn::apply_graphics));
     }
 }
 

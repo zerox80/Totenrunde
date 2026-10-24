@@ -19,7 +19,23 @@ pub struct WeaponName;
 #[derive(Component)]
 pub struct Grenade(pub u32);
 
-pub fn spawn(mut commands: Commands, assets: Res<GameAssets>) {
+/// Hinweis unter dem Fadenkreuz ("NACHLADEN", "WENIG MUNITION", "KEINE MUNITION")
+#[derive(Component)]
+pub struct AmmoHint;
+
+pub fn spawn(mut commands: Commands, assets: Res<GameAssets>, asset_server: Res<AssetServer>) {
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                width: percent(100),
+                top: percent(58),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            DespawnOnExit(AppState::Playing),
+        ))
+        .with_child((AmmoHint, label("", &assets.font_bold, 20.0, Color::srgba(1.0, 1.0, 1.0, 0.9))));
     commands
         .spawn((
             Node {
@@ -33,7 +49,17 @@ pub fn spawn(mut commands: Commands, assets: Res<GameAssets>) {
             DespawnOnExit(AppState::Playing),
         ))
         .with_children(|p| {
-            p.spawn((WeaponName, label("", &assets.font_bold, 18.0, Color::srgba(1.0, 1.0, 1.0, 0.85))));
+            p.spawn((WeaponName, label("", &assets.font_bold, 17.0, Color::srgba(0.92, 0.9, 0.84, 0.9))));
+            // feine Linie unter dem Namen
+            p.spawn((
+                Node {
+                    width: px(170),
+                    height: px(2),
+                    margin: UiRect::vertical(px(3)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.35)),
+            ));
             p.spawn(Node {
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::FlexEnd,
@@ -41,7 +67,7 @@ pub fn spawn(mut commands: Commands, assets: Res<GameAssets>) {
                 ..default()
             })
             .with_children(|r| {
-                r.spawn((MagText, label("8", &assets.font_black, 46.0, Color::WHITE)));
+                r.spawn((MagText, label("8", &assets.font_black, 52.0, Color::WHITE)));
                 r.spawn((
                     ReserveText,
                     label("/ 80", &assets.font_bold, 24.0, Color::srgba(1.0, 1.0, 1.0, 0.75)),
@@ -61,13 +87,16 @@ pub fn spawn(mut commands: Commands, assets: Res<GameAssets>) {
                 for i in 0..4u32 {
                     g.spawn((
                         Grenade(i),
-                        Node {
-                            width: px(12),
-                            height: px(16),
-                            border_radius: BorderRadius::all(px(6)),
+                        ImageNode {
+                            image: asset_server.load("ui/grenade.png"),
+                            color: Color::srgb(0.62, 0.68, 0.5),
                             ..default()
                         },
-                        BackgroundColor(Color::srgb(0.45, 0.55, 0.35)),
+                        Node {
+                            width: px(26),
+                            height: px(26),
+                            ..default()
+                        },
                     ));
                 }
             });
@@ -81,12 +110,24 @@ pub fn update(
     mut res: Query<&mut Text, (With<ReserveText>, Without<MagText>, Without<WeaponName>)>,
     mut name: Query<&mut Text, (With<WeaponName>, Without<MagText>, Without<ReserveText>)>,
     mut nades: Query<(&Grenade, &mut Visibility)>,
+    mut hint: Query<&mut Text, (With<AmmoHint>, Without<MagText>, Without<ReserveText>, Without<WeaponName>)>,
 ) {
+    let h = match lo.current_slot() {
+        Some(s) if s.mag == 0 && s.reserve == 0 => "KEINE MUNITION",
+        Some(s) if s.mag as f32 <= (def(s.weapon).mag_size(s.upgraded) as f32 * 0.25).max(1.0) && s.reserve > 0 => "NACHLADEN",
+        Some(s) if s.reserve <= def(s.weapon).mag_size(s.upgraded) && s.mag > 0 => "WENIG MUNITION",
+        _ => "",
+    };
+    for mut t in hint.iter_mut() {
+        if t.0 != h {
+            t.0 = h.to_string();
+        }
+    }
     let (m, r, n, low) = match lo.current_slot() {
         Some(s) => {
             let d = def(s.weapon);
             let low = s.mag as f32 <= (d.mag_size(s.upgraded) as f32 * 0.25).max(1.0);
-            (s.mag.to_string(), format!("/ {}", s.reserve), d.display_name(s.upgraded).to_string(), low)
+            (s.mag.to_string(), format!("/ {}", s.reserve), d.display_name(s.upgraded).to_uppercase(), low)
         }
         None => (String::new(), String::new(), String::new(), false),
     };

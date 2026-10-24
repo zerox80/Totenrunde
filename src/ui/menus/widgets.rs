@@ -18,9 +18,9 @@ pub enum MenuAction {
 }
 
 pub const BLOOD: Color = Color::srgb(0.62, 0.05, 0.04);
-const IDLE: Color = Color::srgba(0.08, 0.06, 0.06, 0.85);
-const HOVER: Color = Color::srgba(0.38, 0.04, 0.03, 0.95);
-const PRESS: Color = Color::srgba(0.55, 0.06, 0.04, 1.0);
+pub const IDLE: Color = Color::srgba(0.08, 0.06, 0.06, 0.85);
+pub const HOVER: Color = Color::srgba(0.38, 0.04, 0.03, 0.95);
+pub const PRESS: Color = Color::srgba(0.55, 0.06, 0.04, 1.0);
 
 pub fn text(s: impl Into<String>, font: &Handle<Font>, size: f32, color: Color) -> impl Bundle {
     (

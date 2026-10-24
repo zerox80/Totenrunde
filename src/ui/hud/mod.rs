@@ -30,7 +30,6 @@ impl Plugin for HudPlugin {
                 (
                     spawn_crosshair,
                     round::spawn,
-                    points::spawn,
                     ammo::spawn,
                     powerups::spawn,
                     prompt::spawn,
@@ -67,6 +66,10 @@ struct DebugText;
 #[derive(Component)]
 struct Crosshair;
 
+/// Ein Strich des Fadenkreuzes (Richtung x, y)
+#[derive(Component)]
+struct CrossLine(Vec2);
+
 fn spawn_crosshair(mut commands: Commands) {
     commands
         .spawn((
@@ -89,8 +92,10 @@ fn spawn_crosshair(mut commands: Commands) {
                 ..default()
             })
             .with_children(|c| {
-                for (w, h, x, y) in [(2.0, 8.0, 0.0, -10.0), (2.0, 8.0, 0.0, 10.0), (8.0, 2.0, -10.0, 0.0), (8.0, 2.0, 10.0, 0.0)] {
+                for (w, h, x, y) in [(2.0, 9.0, 0.0, -10.0), (2.0, 9.0, 0.0, 10.0), (9.0, 2.0, -10.0, 0.0), (9.0, 2.0, 10.0, 0.0)] {
                     c.spawn((
+                        CrossLine(Vec2::new(x, y) / 10.0),
+                        BoxShadow::new(Color::srgba(0.0, 0.0, 0.0, 0.6), Val::Px(0.0), Val::Px(0.0), Val::Px(1.0), Val::Px(1.5)),
                         Node {
                             position_type: PositionType::Absolute,
                             width: px(w),
@@ -123,8 +128,26 @@ fn spawn_crosshair(mut commands: Commands) {
 }
 
 /// Beim Zielen (Kimme und Korn) und während Aktionen kein Fadenkreuz – wie in CoD.
-fn crosshair_visibility(player: Single<&Player>, mut q: Query<&mut Visibility, With<Crosshair>>) {
+/// Die Striche wandern mit der Streuung (Laufen, Dauerfeuer) nach außen.
+fn crosshair_visibility(
+    time: Res<Time>,
+    player: Single<&Player>,
+    lo: Single<&crate::weapons::Loadout>,
+    mut q: Query<&mut Visibility, With<Crosshair>>,
+    mut lines: Query<(&CrossLine, &mut Node)>,
+    mut gap: Local<f32>,
+) {
     let show = player.ads < 0.3;
+    let base = lo.current_slot().map(|s| crate::weapons::def(s.weapon).spread_hip).unwrap_or(2.0);
+    let want = 6.0 + base * 3.0 + player.bob * 14.0 + lo.bloom * 6.0;
+    *gap += (want - *gap) * (time.delta_secs() * 12.0).min(1.0);
+    for (l, mut n) in lines.iter_mut() {
+        let (w, h) = if l.0.x == 0.0 { (2.0, 9.0) } else { (9.0, 2.0) };
+        let x = l.0.x * (*gap + 4.5);
+        let y = l.0.y * (*gap + 4.5);
+        n.left = Val::Px(x - w / 2.0);
+        n.top = Val::Px(y - h / 2.0);
+    }
     for mut v in q.iter_mut() {
         let want = if show { Visibility::Inherited } else { Visibility::Hidden };
         if *v != want {
@@ -136,14 +159,16 @@ fn crosshair_visibility(player: Single<&Player>, mut q: Query<&mut Visibility, W
 fn debug_text(
     keys: Res<ButtonInput<KeyCode>>,
     mut show: ResMut<ShowFps>,
+    mut settings: ResMut<crate::base::settings::Settings>,
     cfg: Res<crate::base::debug::DebugConfig>,
     diag: Res<DiagnosticsStore>,
     player: Query<(&Transform, &Player)>,
     mut text: Query<&mut Text, With<DebugText>>,
 ) {
     if keys.just_pressed(KeyCode::F3) {
-        show.0 = !show.0;
+        settings.show_fps = !settings.show_fps;
     }
+    show.0 = settings.show_fps;
     let fps = diag
         .get(&FrameTimeDiagnosticsPlugin::FPS)
         .and_then(|d| d.smoothed())

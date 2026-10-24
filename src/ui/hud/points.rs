@@ -4,7 +4,6 @@ use bevy::prelude::*;
 
 use super::widgets::label;
 use crate::base::assets::GameAssets;
-use crate::base::AppState;
 use crate::game::points::Score;
 
 #[derive(Component)]
@@ -17,28 +16,6 @@ pub struct PointsAnchor;
 pub struct Popup {
     pub t: f32,
     pub dx: f32,
-}
-
-pub fn spawn(mut commands: Commands, assets: Res<GameAssets>) {
-    commands
-        .spawn((
-            PointsAnchor,
-            Node {
-                position_type: PositionType::Absolute,
-                right: px(40),
-                bottom: px(150),
-                min_width: px(150),
-                padding: UiRect::axes(px(16), px(6)),
-                justify_content: JustifyContent::FlexEnd,
-                border_radius: BorderRadius::all(px(4)),
-                ..default()
-            },
-            BackgroundColor(Color::srgba(0.85, 0.66, 0.12, 0.85)),
-            DespawnOnExit(AppState::Playing),
-        ))
-        .with_children(|p| {
-            p.spawn((PointsText, label("500", &assets.font_black, 30.0, Color::WHITE)));
-        });
 }
 
 pub fn update(score: Res<Score>, mut q: Query<&mut Text, With<PointsText>>) {
@@ -74,8 +51,8 @@ pub fn popups(
             label(txt, &assets.font_black, 24.0, col),
             Node {
                 position_type: PositionType::Absolute,
-                right: px(170),
-                bottom: px(4),
+                left: px(200),
+                bottom: px(10),
                 ..default()
             },
             ChildOf(anchor),
@@ -85,8 +62,8 @@ pub fn popups(
     for (e, mut p, mut n, mut c) in q.iter_mut() {
         p.t += time.delta_secs();
         let k = p.t / 1.1;
-        n.bottom = px(4.0 + k * 70.0);
-        n.right = px(170.0 + p.dx + k * 30.0);
+        n.bottom = px(10.0 + k * 60.0);
+        n.left = px(200.0 + p.dx + k * 50.0);
         c.0 = c.0.with_alpha((1.0 - k).clamp(0.0, 1.0));
         if k >= 1.0 {
             commands.entity(e).despawn();

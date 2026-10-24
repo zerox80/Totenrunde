@@ -31,6 +31,7 @@ fn sync(mut commands: Commands, game: Res<InGame>, roots: Query<Entity, With<Pau
                     },
                 ));
                 button(p, "WEITER", MenuAction::Resume, &assets.font_bold);
+                super::graphics::open_button(p, &assets.font_bold);
                 button(p, "HAUPTMENÜ", MenuAction::MainMenu, &assets.font_bold);
                 button(p, "BEENDEN", MenuAction::Quit, &assets.font_bold);
             });

@@ -24,16 +24,16 @@ pub struct PerkRow;
 #[derive(Component)]
 pub struct PerkIcon(pub Perk);
 
-pub fn spawn(mut commands: Commands, assets: Res<GameAssets>) {
+pub fn spawn(mut commands: Commands, asset_server: Res<AssetServer>, assets: Res<GameAssets>) {
     commands
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                left: px(36),
-                bottom: px(26),
+                left: px(30),
+                bottom: px(18),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::FlexStart,
-                row_gap: px(10),
+                row_gap: px(6),
                 ..default()
             },
             DespawnOnExit(AppState::Playing),
@@ -43,46 +43,58 @@ pub fn spawn(mut commands: Commands, assets: Res<GameAssets>) {
                 PerkRow,
                 Node {
                     flex_direction: FlexDirection::Row,
-                    column_gap: px(8),
+                    column_gap: px(6),
+                    margin: UiRect::bottom(px(4)),
                     ..default()
                 },
             ));
-            // Strichliste (5 Striche, der fünfte quer)
+            p.spawn((
+                super::points::PointsAnchor,
+                Node {
+                    width: px(260),
+                    height: px(52),
+                    padding: UiRect::new(px(18), px(30), px(4), px(4)),
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                ImageNode::new(asset_server.load("ui/points_bar.png")),
+            ))
+            .with_children(|b| {
+                b.spawn((super::points::PointsText, label("500", &assets.font_black, 34.0, Color::WHITE)));
+            });
+            // Kreide: Strichliste (Runde 1–5) bzw. Ziffern
             p.spawn(Node {
-                width: px(150),
-                height: px(96),
+                width: px(240),
+                height: px(150),
                 ..default()
             })
             .with_children(|t| {
-                for i in 0..5u32 {
-                    let (left, rot, h) = if i < 4 {
-                        (8.0 + i as f32 * 24.0, -0.08 + (i as f32 * 0.07).sin() * 0.05, 86.0)
-                    } else {
-                        (52.0, 1.05, 124.0)
-                    };
+                for i in 1..=5u32 {
                     t.spawn((
-                        Tally(i + 1),
-                        Node {
-                            position_type: PositionType::Absolute,
-                            left: px(left),
-                            top: px(if i < 4 { 4.0 } else { -14.0 }),
-                            width: px(9),
-                            height: px(h),
-                            border_radius: BorderRadius::all(px(4)),
+                        Tally(i),
+                        ImageNode {
+                            image: asset_server.load(format!("ui/chalk_tally_{i}.png")),
+                            color: CHALK_RED,
                             ..default()
                         },
-                        UiTransform::from_rotation(Rot2::radians(rot)),
-                        BackgroundColor(CHALK_RED),
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: px(0),
+                            top: px(0),
+                            width: px(200),
+                            height: px(150),
+                            ..default()
+                        },
                         Visibility::Hidden,
                     ));
                 }
                 t.spawn((
                     RoundNumber,
-                    label("", &assets.font_black, 96.0, CHALK_RED),
                     Node {
                         position_type: PositionType::Absolute,
                         left: px(0),
-                        top: px(-14),
+                        top: px(0),
+                        flex_direction: FlexDirection::Row,
                         ..default()
                     },
                 ));
@@ -90,12 +102,21 @@ pub fn spawn(mut commands: Commands, assets: Res<GameAssets>) {
         });
 }
 
+/// Ziffer in Kreide
+#[derive(Component)]
+pub struct ChalkDigit;
+
+#[allow(clippy::too_many_arguments)]
 pub fn update(
+    mut commands: Commands,
     time: Res<Time>,
     game: Res<InGame>,
     rounds: Option<Res<Rounds>>,
-    mut num: Query<(&mut Text, &mut TextColor), With<RoundNumber>>,
-    mut tallies: Query<(&Tally, &mut Visibility, &mut BackgroundColor)>,
+    asset_server: Res<AssetServer>,
+    num: Query<(Entity, Option<&Children>), With<RoundNumber>>,
+    mut digits: Query<&mut ImageNode, (With<ChalkDigit>, Without<Tally>)>,
+    mut tallies: Query<(&Tally, &mut Visibility, &mut ImageNode), Without<ChalkDigit>>,
+    mut shown: Local<u32>,
 ) {
     let Some(r) = rounds else { return };
     let round = r.round;
@@ -107,19 +128,45 @@ pub fn update(
     let since = game.time - r.changed_at;
     let flash = if since < 3.0 { pulse } else { pulse * 0.6 };
     let col = CHALK_RED.mix(&Color::srgb(0.95, 0.92, 0.88), flash);
-    for (mut t, mut c) in num.iter_mut() {
-        let s = if round > 5 { round.to_string() } else { String::new() };
-        if t.0 != s {
-            t.0 = s;
+    if let Ok((e, children)) = num.single() {
+        if *shown != round {
+            *shown = round;
+            if let Some(ch) = children {
+                for c in ch.iter() {
+                    commands.entity(c).despawn();
+                }
+            }
+            if round > 5 {
+                for (i, d) in round.to_string().chars().enumerate() {
+                    commands.spawn((
+                        ChalkDigit,
+                        ImageNode {
+                            image: asset_server.load(format!("ui/chalk_{d}.png")),
+                            color: col,
+                            ..default()
+                        },
+                        Node {
+                            width: px(96),
+                            height: px(120),
+                            margin: UiRect::left(px(if i == 0 { 0.0 } else { -22.0 })),
+                            ..default()
+                        },
+                        UiTransform::from_rotation(Rot2::radians(-0.04 + i as f32 * 0.05)),
+                        ChildOf(e),
+                    ));
+                }
+            }
         }
-        c.0 = col;
     }
-    for (tally, mut v, mut bg) in tallies.iter_mut() {
-        let want = if round <= 5 && tally.0 <= round { Visibility::Inherited } else { Visibility::Hidden };
+    for mut img in digits.iter_mut() {
+        img.color = col;
+    }
+    for (tally, mut v, mut img) in tallies.iter_mut() {
+        let want = if round <= 5 && tally.0 == round { Visibility::Inherited } else { Visibility::Hidden };
         if *v != want {
             *v = want;
         }
-        bg.0 = col;
+        img.color = col;
     }
 }
 
@@ -143,8 +190,8 @@ pub fn perk_icons(
         let mut e = commands.spawn((
             PerkIcon(*perk),
             Node {
-                width: px(48),
-                height: px(48),
+                width: px(44),
+                height: px(44),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 border: UiRect::all(px(2)),

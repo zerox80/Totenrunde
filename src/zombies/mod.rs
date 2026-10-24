@@ -2,6 +2,7 @@
 
 pub mod ai;
 pub mod anim;
+pub mod blob;
 pub mod damage;
 pub mod hitbox;
 pub mod spawn;
@@ -26,6 +27,8 @@ impl Plugin for ZombiePlugin {
             .add_message::<ZombieKilled>()
             .init_resource::<steering::FlowTimer>()
             .init_resource::<spawn::ZombieMats>()
+            .add_systems(Startup, blob::setup)
+            .add_systems(Update, blob::attach)
             .add_systems(
                 Update,
                 (steering::update_flow, ai::zombie_ai, steering::zombie_separation, anim::animate_zombies)

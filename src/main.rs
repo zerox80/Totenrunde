@@ -42,6 +42,7 @@ fn main() {
                 })
                 .set(ImagePlugin::default_linear()),
         )
+        .add_plugins(bevy::post_process::auto_exposure::AutoExposurePlugin)
         .add_plugins((
             base::BasePlugin,
             audio::GameAudioPlugin,

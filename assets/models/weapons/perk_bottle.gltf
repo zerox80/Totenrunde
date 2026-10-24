@@ -35,71 +35,76 @@
 			"name":"W_BottleGlass",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.14702726900577545,
-					0.0423114113509655,
-					0.023153366521000862,
+					0.10224173218011856,
+					0.027320891618728638,
+					0.014443843625485897,
 					1
 				],
-				"metallicFactor":0.20000000298023224,
-				"roughnessFactor":0.10000000149011612
+				"metallicFactor":0.10000000149011612,
+				"roughnessFactor":0.07999999821186066
 			}
 		},
 		{
 			"emissiveFactor":[
-				0.07421357184648514,
 				1,
+				0.44520118832588196,
 				0.06847816705703735
 			],
 			"extensions":{
 				"KHR_materials_emissive_strength":{
-					"emissiveStrength":10
+					"emissiveStrength":2
 				}
 			},
 			"name":"W_Glow",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.20507873594760895,
 					1,
-					0.1946178376674652,
+					0.6514056324958801,
+					0.1441284716129303,
 					1
 				],
 				"metallicFactor":0,
-				"roughnessFactor":0.30000001192092896
+				"roughnessFactor":0.699999988079071
+			}
+		},
+		{
+			"name":"W_perk_bottle",
+			"normalTexture":{
+				"index":0
+			},
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.800000011920929,
+					0.800000011920929,
+					0.800000011920929,
+					1
+				],
+				"baseColorTexture":{
+					"index":1
+				},
+				"metallicRoughnessTexture":{
+					"index":2
+				}
 			}
 		},
 		{
 			"name":"W_Hands",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.43415364623069763,
-					0.2541520893573761,
-					0.1441284716129303,
-					1
-				],
-				"baseColorTexture":{
-					"index":0
-				},
-				"metallicFactor":0,
-				"roughnessFactor":0.800000011920929
-			}
-		},
-		{
-			"name":"W_Sleeve",
 			"normalTexture":{
-				"index":1
+				"index":3
 			},
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.14995978772640228,
-					0.1441284716129303,
-					0.08437620848417282,
+					0.800000011920929,
+					0.800000011920929,
+					0.800000011920929,
 					1
 				],
 				"baseColorTexture":{
-					"index":2
+					"index":4
 				},
-				"metallicFactor":0,
-				"roughnessFactor":0.949999988079071
+				"metallicRoughnessTexture":{
+					"index":5
+				}
 			}
 		}
 	],
@@ -158,30 +163,57 @@
 		{
 			"sampler":0,
 			"source":2
+		},
+		{
+			"sampler":0,
+			"source":3
+		},
+		{
+			"sampler":0,
+			"source":4
+		},
+		{
+			"sampler":0,
+			"source":5
 		}
 	],
 	"images":[
 		{
 			"mimeType":"image/png",
-			"name":"polymer.png",
-			"uri":"../../textures/polymer.png"
+			"name":"w_perk_bottle_n.png",
+			"uri":"../../textures/w_perk_bottle_n.png"
 		},
 		{
 			"mimeType":"image/png",
-			"name":"fabric_n.png",
-			"uri":"../../textures/fabric_n.png"
+			"name":"w_perk_bottle_albedo.png",
+			"uri":"../../textures/w_perk_bottle_albedo.png"
 		},
 		{
 			"mimeType":"image/png",
-			"name":"fabric.png",
-			"uri":"../../textures/fabric.png"
+			"name":"w_perk_bottle_mr.png",
+			"uri":"../../textures/w_perk_bottle_mr.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"fparms_n.png",
+			"uri":"../../textures/fparms_n.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"fparms_albedo.png",
+			"uri":"../../textures/fparms_albedo.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"fparms_mr.png",
+			"uri":"../../textures/fparms_mr.png"
 		}
 	],
 	"accessors":[
 		{
 			"bufferView":0,
 			"componentType":5126,
-			"count":248,
+			"count":642,
 			"max":[
 				0.03400000184774399,
 				0.20600000023841858,
@@ -197,25 +229,25 @@
 		{
 			"bufferView":1,
 			"componentType":5126,
-			"count":248,
+			"count":642,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":2,
 			"componentType":5126,
-			"count":248,
+			"count":642,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":3,
 			"componentType":5123,
-			"count":1068,
+			"count":2484,
 			"type":"SCALAR"
 		},
 		{
 			"bufferView":4,
 			"componentType":5126,
-			"count":88,
+			"count":408,
 			"max":[
 				0.03519999980926514,
 				0.0949999988079071,
@@ -231,185 +263,185 @@
 		{
 			"bufferView":5,
 			"componentType":5126,
-			"count":88,
+			"count":408,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":6,
 			"componentType":5126,
-			"count":88,
+			"count":408,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":7,
 			"componentType":5123,
-			"count":228,
+			"count":1140,
 			"type":"SCALAR"
 		},
 		{
 			"bufferView":8,
 			"componentType":5126,
-			"count":538,
+			"count":312,
 			"max":[
-				0.1040344089269638,
-				0.10500000417232513,
-				0.3322315514087677
+				0.013799999840557575,
+				0.210999995470047,
+				0.013799999840557575
 			],
 			"min":[
-				-0.03131335228681564,
-				-0.28137123584747314,
-				-0.023400001227855682
+				-0.013799999840557575,
+				0.203000009059906,
+				-0.013799999840557575
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":9,
 			"componentType":5126,
-			"count":538,
+			"count":312,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":10,
 			"componentType":5126,
-			"count":538,
+			"count":312,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":11,
 			"componentType":5123,
-			"count":792,
+			"count":852,
 			"type":"SCALAR"
 		},
 		{
 			"bufferView":12,
 			"componentType":5126,
-			"count":118,
+			"count":6682,
 			"max":[
-				0.17521902918815613,
-				-0.020217061042785645,
-				0.5280040502548218
+				0.11149873584508896,
+				0.15141558647155762,
+				0.3471521735191345
 			],
 			"min":[
-				-0.042675793170928955,
-				-0.4765702188014984,
-				0.06914641708135605
+				-0.0407160222530365,
+				-0.230189710855484,
+				-0.07750800251960754
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":13,
 			"componentType":5126,
-			"count":118,
+			"count":6682,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":14,
 			"componentType":5126,
-			"count":118,
+			"count":6682,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":15,
 			"componentType":5123,
-			"count":264,
+			"count":29997,
 			"type":"SCALAR"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":2976,
+			"byteLength":7704,
 			"byteOffset":0,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":2976,
-			"byteOffset":2976,
+			"byteLength":7704,
+			"byteOffset":7704,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":1984,
-			"byteOffset":5952,
+			"byteLength":5136,
+			"byteOffset":15408,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":2136,
-			"byteOffset":7936,
+			"byteLength":4968,
+			"byteOffset":20544,
 			"target":34963
 		},
 		{
 			"buffer":0,
-			"byteLength":1056,
-			"byteOffset":10072,
+			"byteLength":4896,
+			"byteOffset":25512,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":1056,
-			"byteOffset":11128,
+			"byteLength":4896,
+			"byteOffset":30408,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":704,
-			"byteOffset":12184,
+			"byteLength":3264,
+			"byteOffset":35304,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":456,
-			"byteOffset":12888,
+			"byteLength":2280,
+			"byteOffset":38568,
 			"target":34963
 		},
 		{
 			"buffer":0,
-			"byteLength":6456,
-			"byteOffset":13344,
+			"byteLength":3744,
+			"byteOffset":40848,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":6456,
-			"byteOffset":19800,
+			"byteLength":3744,
+			"byteOffset":44592,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":4304,
-			"byteOffset":26256,
+			"byteLength":2496,
+			"byteOffset":48336,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":1584,
-			"byteOffset":30560,
+			"byteLength":1704,
+			"byteOffset":50832,
 			"target":34963
 		},
 		{
 			"buffer":0,
-			"byteLength":1416,
-			"byteOffset":32144,
+			"byteLength":80184,
+			"byteOffset":52536,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":1416,
-			"byteOffset":33560,
+			"byteLength":80184,
+			"byteOffset":132720,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":944,
-			"byteOffset":34976,
+			"byteLength":53456,
+			"byteOffset":212904,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":528,
-			"byteOffset":35920,
+			"byteLength":59994,
+			"byteOffset":266360,
 			"target":34963
 		}
 	],
@@ -421,7 +453,7 @@
 	],
 	"buffers":[
 		{
-			"byteLength":36448,
+			"byteLength":326356,
 			"uri":"perk_bottle.bin"
 		}
 	]

@@ -123,8 +123,8 @@ const fn pap(damage_mult: f32, mag: u32, reserve: u32) -> PapStats {
 
 const RIFLE_HIP: Vec3 = Vec3::new(0.12, -0.11, -0.25);
 const RIFLE_ADS: Vec3 = Vec3::new(0.0, -0.0, -0.17);
-const PISTOL_HIP: Vec3 = Vec3::new(0.105, -0.095, -0.30);
-const PISTOL_ADS: Vec3 = Vec3::new(0.0, 0.0, -0.33);
+const PISTOL_HIP: Vec3 = Vec3::new(0.105, -0.092, -0.34);
+const PISTOL_ADS: Vec3 = Vec3::new(0.0, 0.0, -0.42);
 
 pub const WEAPONS: &[WeaponDef] = &[
     WeaponDef {
