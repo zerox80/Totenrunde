@@ -1,10 +1,11 @@
-//! Schaden auswerten: Punkte (+10 pro Treffer, 50–100 pro Kill, 130 mit dem Messer),
-//! Sofort-Tod, Kopfschüsse (Kopf platzt), Tod mit Fallrichtung.
+//! Schaden auswerten: Punkte (+10 pro Treffer, 50–100 pro Kill, 130 mit dem Messer; solo
+//! x1.5), Sofort-Tod, Kopfschüsse (Kopf platzt), Tod mit Fallrichtung.
 
 use bevy::prelude::*;
 
 use super::{DamageKind, HitPart, ZState, Zombie, ZombieHit, ZombieKilled, ZombieRig};
 use crate::fx::FxEvent;
+use crate::game::balance::Balance;
 use crate::game::points::Score;
 use crate::game::powerups::ActivePowerups;
 use crate::world::barricades::Barricades;
@@ -17,6 +18,7 @@ pub fn apply_damage(
     mut barricades: ResMut<Barricades>,
     mut commands: Commands,
     powerups: Res<ActivePowerups>,
+    bal: Res<Balance>,
     mut score: ResMut<Score>,
     mut fx: MessageWriter<FxEvent>,
 ) {
@@ -55,6 +57,7 @@ pub fn apply_damage(
             },
         };
         if pts > 0 {
+            let pts = (pts as f32 * bal.kill_points).round() as u32;
             score.add(pts, &powerups, Some(h.point));
         }
         score.kills += 1;

@@ -1,13 +1,15 @@
-//! Rundenlogik mit den Formeln aus dem Original:
+//! Rundenlogik mit den Formeln aus dem Original (Solo-Erleichterungen siehe `balance`):
 //!
 //! * Zombie-Gesundheit: 150 in Runde 1, +100 pro Runde bis Runde 9, danach x1.1 pro Runde
-//! * Anzahl (Solo): 24 + 0.5·6·Multiplikator, in den ersten Runden prozentual reduziert
+//! * Anzahl: 24 + 0.5·6·Multiplikator (Solo) bzw. + (Spieler−1)·6·Multiplikator (Koop),
+//!   in den ersten Runden prozentual reduziert
 //! * Spawn-Verzögerung: 2 s, pro Runde x0.95 (min. 0.08 s), max. 24 gleichzeitig
-//! * Tempo: Rundenwert·8 + Zufall entscheidet über Gehen / Laufen / Sprinten
+//! * Tempo: Rundenwert·8 (Solo ·6) + Zufall entscheidet über Gehen / Laufen / Sprinten
 
 use bevy::prelude::*;
 use rand::Rng;
 
+use super::balance::Balance;
 use super::powerups::{self, ActivePowerups};
 use super::spawning::pick_spawner;
 use crate::audio::{Sfx, SfxEvent};
@@ -69,13 +71,14 @@ pub fn zombie_health(round: u32) -> f32 {
     }
 }
 
-pub fn zombie_count(round: u32) -> u32 {
+pub fn zombie_count(round: u32, players: u32) -> u32 {
     let r = round.max(1) as f32;
     let mut mult = (r / 5.0).max(1.0);
     if round >= 10 {
         mult *= r * 0.15;
     }
-    let mut max = 24.0 + (0.5 * 6.0 * mult).floor();
+    let per_player = if players <= 1 { 0.5 } else { (players - 1) as f32 };
+    let mut max = 24.0 + (per_player * 6.0 * mult).floor();
     max = match round {
         0 | 1 => (max * 0.25).floor(),
         2 => (max * 0.3).floor(),
@@ -91,8 +94,8 @@ pub fn spawn_delay(round: u32) -> f32 {
     (2.0 * 0.95f32.powi(round.max(1) as i32 - 1)).max(0.08)
 }
 
-pub fn speed_class(round: u32, rng: &mut impl Rng) -> SpeedClass {
-    let v = round as i32 * 8 + rng.random_range(-12..26);
+pub fn speed_class(round: u32, per_round: i32, rng: &mut impl Rng) -> SpeedClass {
+    let v = round as i32 * per_round + rng.random_range(-12..26);
     if v <= 35 {
         SpeedClass::Walk
     } else if v <= 70 {
@@ -117,9 +120,16 @@ fn reset_rounds(mut commands: Commands, cfg: Res<DebugConfig>, mut over: ResMut<
     });
 }
 
-fn start_round(r: &mut Rounds, now: f32, pu: &mut ActivePowerups, lo: &mut Loadout, sfx: &mut MessageWriter<SfxEvent>) {
+fn start_round(
+    r: &mut Rounds,
+    bal: &Balance,
+    now: f32,
+    pu: &mut ActivePowerups,
+    lo: &mut Loadout,
+    sfx: &mut MessageWriter<SfxEvent>,
+) {
     r.round += 1;
-    r.to_spawn = zombie_count(r.round);
+    r.to_spawn = zombie_count(r.round, bal.players);
     r.total = r.to_spawn;
     r.spawned = 0;
     r.killed_this_round = 0;
@@ -129,7 +139,7 @@ fn start_round(r: &mut Rounds, now: f32, pu: &mut ActivePowerups, lo: &mut Loado
     powerups::new_round(pu);
     lo.grenades = (lo.grenades + 2).min(MAX_GRENADES);
     sfx.write(SfxEvent::ui(Sfx::RoundStart));
-    info!("Runde {} beginnt: {} Zombies, {} HP", r.round, r.to_spawn, zombie_health(r.round));
+    info!("Runde {} beginnt: {} Zombies, {} HP", r.round, r.to_spawn, zombie_health(r.round) * bal.zombie_health);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -137,6 +147,7 @@ fn round_logic(
     mut commands: Commands,
     time: Res<Time>,
     game: Res<InGame>,
+    bal: Res<Balance>,
     mut rounds: ResMut<Rounds>,
     map: Res<MapFile>,
     zones: Res<Zones>,
@@ -156,7 +167,7 @@ fn round_logic(
         RoundPhase::Intro { t } => {
             let t = t + dt;
             if t >= 2.0 {
-                start_round(&mut rounds, now, &mut pu, &mut lo, &mut sfx);
+                start_round(&mut rounds, &bal, now, &mut pu, &mut lo, &mut sfx);
             } else {
                 rounds.phase = RoundPhase::Intro { t };
             }
@@ -165,7 +176,7 @@ fn round_logic(
             let t = t + dt;
             if t >= 11.0 {
                 score.repair_points_round = 0;
-                start_round(&mut rounds, now, &mut pu, &mut lo, &mut sfx);
+                start_round(&mut rounds, &bal, now, &mut pu, &mut lo, &mut sfx);
             } else {
                 rounds.phase = RoundPhase::Intermission { t };
             }
@@ -186,7 +197,7 @@ fn round_logic(
                     let pos = Vec3::from_array(sp.pos);
                     let to_player = ptf.translation - pos;
                     let yaw = (-to_player.x).atan2(-to_player.z);
-                    let class = speed_class(rounds.round, &mut rng);
+                    let class = speed_class(rounds.round, bal.speed_per_round, &mut rng);
                     let (state, start_pos) = if sp.kind == "riser" {
                         fx.write(FxEvent::Dirt { pos });
                         sfx.write(SfxEvent::at(Sfx::ZombieRise, pos));
@@ -202,13 +213,13 @@ fn round_logic(
                             pos: start_pos,
                             yaw,
                             state,
-                            health: zombie_health(rounds.round),
+                            health: zombie_health(rounds.round) * bal.zombie_health,
                             class,
                         },
                     );
                     rounds.to_spawn -= 1;
                     rounds.spawned += 1;
-                    rounds.spawn_cd = spawn_delay(rounds.round) * rng.random_range(0.8..1.2);
+                    rounds.spawn_cd = spawn_delay(rounds.round) * bal.spawn_delay * rng.random_range(0.8..1.2);
                 } else {
                     rounds.spawn_cd = 0.5;
                 }

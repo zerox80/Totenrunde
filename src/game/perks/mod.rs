@@ -88,7 +88,7 @@ impl Perk {
     pub fn description(self) -> &'static str {
         match self {
             Perk::QuickRevive => "Selbstwiederbelebung (solo, 3x) und schnellere Heilung",
-            Perk::Juggernog => "Hält 5 statt 2 Treffer aus",
+            Perk::Juggernog => "Hält 2,5-mal so viele Treffer aus",
             Perk::SpeedCola => "Doppelt so schnell nachladen und Barrikaden reparieren",
             Perk::DoubleTap => "Schnellere Feuerrate, doppelter Schaden",
             Perk::StaminUp => "Schneller und länger sprinten",

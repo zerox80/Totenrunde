@@ -64,14 +64,15 @@ fn load_level(
         ))
         .observe(on_map_ready);
 
-    // Mondlicht mit Schatten
+    // Mondlicht. Seine Schatten stecken in den Lightmaps; Echtzeit-Schatten würden nur Zombies,
+    // Automaten und Türen unter Dächern abdunkeln (auf der Karte wirkt der Mond nur als Glanz).
     let sun_dir = Vec3::from_array(map.sun.dir).normalize();
     commands.spawn((
         Name::new("Mond"),
         DirectionalLight {
             color: Color::linear_rgb(map.sun.color[0], map.sun.color[1], map.sun.color[2]),
             illuminance: map.sun.illuminance,
-            shadow_maps_enabled: settings.shadows || map.lightmaps.is_empty(),
+            shadow_maps_enabled: map.lightmaps.is_empty(),
             // Mondlicht steckt in den Lightmaps; auf gebackenen Flächen nur noch Glanz
             affects_lightmapped_mesh_diffuse: map.lightmaps.is_empty(),
             ..default()

@@ -190,13 +190,11 @@ fn power_lights(time: Res<Time>, power: Res<Power>, mut lights: Query<(&mut Poin
     }
 }
 
-/// Grafik-Einstellungen: Lichtkegel ein/aus, Echtzeit-Schatten der Lampen und des Mondes.
+/// Grafik-Einstellungen: Lichtkegel ein/aus, Echtzeit-Schatten der flackernden Lampen und Feuer.
 fn apply_light_settings(
     settings: Res<crate::base::settings::Settings>,
-    map: Res<MapFile>,
     mut cones: Query<&mut Visibility, With<LightCone>>,
     mut lights: Query<(&MapLight, &mut PointLight)>,
-    mut moon: Query<&mut DirectionalLight>,
     added: Query<(), Added<LightCone>>,
 ) {
     if !settings.is_changed() && added.is_empty() {
@@ -210,12 +208,6 @@ fn apply_light_settings(
         let want = ml.wants_shadow && settings.shadows;
         if pl.shadow_maps_enabled != want {
             pl.shadow_maps_enabled = want;
-        }
-    }
-    for mut d in moon.iter_mut() {
-        let want = settings.shadows || map.lightmaps.is_empty();
-        if d.shadow_maps_enabled != want {
-            d.shadow_maps_enabled = want;
         }
     }
 }

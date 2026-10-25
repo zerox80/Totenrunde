@@ -1,6 +1,7 @@
 //! Spielregeln des Zombie-Modus: Runden, Spawnen, Punkte, Perks, Power-ups,
 //! Interaktionen (Kaufen), Mysteriöse Kiste und Waffen-Verstärker.
 
+pub mod balance;
 pub mod interact;
 pub mod perks;
 pub mod points;
@@ -14,7 +15,7 @@ pub struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((
+        app.add_systems(Startup, balance::setup).add_plugins((
             rounds::RoundsPlugin,
             points::PointsPlugin,
             perks::PerksPlugin,

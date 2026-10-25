@@ -1,11 +1,12 @@
 //! Prozedural animierte Ego-Waffe wie in Call of Duty: Waffe unten rechts mit Händen,
 //! Zielen über Kimme und Korn, Mausträgheit, Wippen, Sprinthaltung, Rückstoß,
 //! Nachlade-Animation (Magazin raus/rein), Waffenwechsel, Messer und Mündungsfeuer.
+//! Waffen mit Zielfernrohr verschwinden beim Zielen hinter dem Fernrohrbild (HUD).
 
 use std::f32::consts::PI;
 
 use bevy::input::mouse::AccumulatedMouseMotion;
-use bevy::light::NotShadowCaster;
+use bevy::light::{NotShadowCaster, NotShadowReceiver};
 use bevy::prelude::*;
 use bevy::world_serialization::WorldInstanceReady;
 use rand::Rng;
@@ -18,6 +19,9 @@ use crate::player::{Player, PlayerCamera};
 /// Maßstab der Ego-Waffe: sie wird verkleinert und nah an die Kamera gesetzt, damit sie
 /// nie in Wände eintaucht (wirkt auf dem Bildschirm identisch).
 pub const VM_SCALE: f32 = 0.22;
+
+/// Ab diesem Zielfortschritt zeigt eine Fernrohr-Waffe das Fernrohrbild statt des Modells.
+pub const SCOPE_IN: f32 = 0.8;
 
 #[derive(Component)]
 pub struct ViewModelRoot {
@@ -141,7 +145,9 @@ fn on_vm_ready(
     let mut parts = ViewModelParts::default();
     for e in children.iter_descendants(ready.entity) {
         if meshes.contains(e) {
-            commands.entity(e).insert(NotShadowCaster);
+            // Keine Weltschatten auf Waffe und Händen: sie sähen sonst je nach Grafikstufe
+            // und Standort (z. B. Mondschatten unter Dächern) fast schwarz aus.
+            commands.entity(e).insert((NotShadowCaster, NotShadowReceiver));
             if upgraded {
                 let keep = mats
                     .get(e)
@@ -184,7 +190,7 @@ pub fn animate_viewmodel(
     time: Res<Time>,
     motion: Res<AccumulatedMouseMotion>,
     player: Single<(&Player, &Loadout)>,
-    mut roots: Query<(&mut ViewModelRoot, &mut Transform), Without<ViewModelScene>>,
+    mut roots: Query<(&mut ViewModelRoot, &mut Transform, &mut Visibility), Without<ViewModelScene>>,
     scenes: Query<&ViewModelParts>,
     mut part_tfs: Query<&mut Transform, (Without<ViewModelRoot>, Without<MuzzleFlash>)>,
     mut flashes: Query<(&mut Transform, &mut Visibility), (With<MuzzleFlash>, Without<ViewModelRoot>)>,
@@ -194,14 +200,17 @@ pub fn animate_viewmodel(
     let dt = time.delta_secs();
     let (pl, lo) = *player;
     let mut rng = rand::rng();
-    for (mut root, mut tf) in roots.iter_mut() {
+    for (mut root, mut tf, mut root_vis) in roots.iter_mut() {
         root.time += dt;
         let Some(slot) = lo.current_slot() else {
             // keine Waffe: Wurzel ausblenden bis auf das Messer
             tf.translation = Vec3::new(0.0, -0.4, -0.3) * VM_SCALE;
+            root_vis.set_if_neq(Visibility::Inherited);
             continue;
         };
         let d = def(slot.weapon);
+        let scoped = d.scope && lo.ads > SCOPE_IN;
+        root_vis.set_if_neq(if scoped { Visibility::Hidden } else { Visibility::Inherited });
         let ads = ease(lo.ads);
         let mut pos = d.hip.lerp(d.ads, ads);
         let mut rot = Quat::IDENTITY;
@@ -350,13 +359,17 @@ pub struct PerkBottle;
 
 pub fn spawn_bottle(mut commands: Commands, cam: Query<Entity, With<PlayerCamera>>, asset_server: Res<AssetServer>) {
     let Ok(ce) = cam.single() else { return };
-    commands.entity(ce).with_child((
-        Name::new("Perk-Flasche"),
-        PerkBottle,
-        WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/weapons/perk_bottle.gltf"))),
-        Transform::from_scale(Vec3::splat(VM_SCALE)),
-        Visibility::Hidden,
-    ));
+    let bottle = commands
+        .spawn((
+            Name::new("Perk-Flasche"),
+            PerkBottle,
+            WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/weapons/perk_bottle.gltf"))),
+            Transform::from_scale(Vec3::splat(VM_SCALE)),
+            Visibility::Hidden,
+        ))
+        .observe(on_vm_ready)
+        .id();
+    commands.entity(ce).add_child(bottle);
 }
 
 /// Flasche hochnehmen, ansetzen, trinken, absetzen (Dauer = Trinkzeit des Perks).

@@ -1,7 +1,8 @@
 //! Spawnt den Spieler mit Ego-Kamera (Bloom, Tonemapping, Nebel, Raumklang-Ohren).
 
 use bevy::core_pipeline::tonemapping::Tonemapping;
-use bevy::post_process::auto_exposure::AutoExposure;
+use bevy::curve::cubic_splines::LinearSpline;
+use bevy::post_process::auto_exposure::{AutoExposure, AutoExposureCompensationCurve};
 use bevy::post_process::bloom::Bloom;
 use bevy::post_process::effect_stack::{ChromaticAberration, Vignette};
 use bevy::render::view::{ColorGrading, ColorGradingGlobal, ColorGradingSection};
@@ -72,24 +73,26 @@ fn bloom() -> Bloom {
     }
 }
 
-/// Filmischer Look: etwas kühler, entsättigt, mehr Kontrast in den Mitten
-fn grading(auto_exposure: bool) -> ColorGrading {
+/// Grundbelichtung aller Grafikstufen (die Augen-Anpassung regelt nur sanft darum herum).
+const BASE_EXPOSURE: f32 = 0.35;
+
+/// Filmischer Look: etwas kühler und entsättigt. Kein Kontrast: Bevy rechnet ihn linear um
+/// 0.5 herum vor der Belichtung, das setzt alle Werte unter ~0.024 auf Schwarz – nachts fast
+/// das ganze Bild.
+fn grading() -> ColorGrading {
     ColorGrading {
         global: ColorGradingGlobal {
-            // Mit Augen-Anpassung wird der Mittelwert auf 18 % Grau geregelt -> dunkler kompensieren
-            exposure: if auto_exposure { -1.1 } else { 0.35 },
+            exposure: BASE_EXPOSURE,
             temperature: -0.01,
             post_saturation: 0.88,
             ..default()
         },
         shadows: ColorGradingSection {
             saturation: 0.8,
-            contrast: 1.05,
             ..default()
         },
         midtones: ColorGradingSection {
             saturation: 0.9,
-            contrast: 1.06,
             ..default()
         },
         highlights: ColorGradingSection {
@@ -99,6 +102,30 @@ fn grading(auto_exposure: bool) -> ColorGrading {
     }
 }
 
+/// Messbereich der Augen-Anpassung (log2 der Leuchtdichte). Bevy wirft alles darunter aus der
+/// Messung; die Untergrenze muss daher tief liegen, sonst misst es nachts nur die Lampen.
+const AE_RANGE: (f32, f32) = (-10.0, 2.0);
+
+/// Augen-Anpassung als Zusatz zur Grundbelichtung: dunkle Szenen werden etwas aufgehellt,
+/// helle etwas abgedunkelt, höchstens um eine Blende. Ohne diese Kurve regelt Bevy voll auf
+/// Mittelgrau; nachts sähe alles grau und flau aus.
+fn exposure_curve() -> AutoExposureCompensationCurve {
+    // mittlere Helligkeit, bei der die Grundbelichtung unverändert bleibt (zwischen beleuchteter
+    // Wartehalle und dunklem Hof). Werte bewusst exakt darstellbar: Bevy vergleicht die
+    // Stützpunkte der Kurve auf exakte Gleichheit.
+    const REFERENCE: f32 = -2.5;
+    const STRENGTH: f32 = 0.25;
+    const MAX_EV: f32 = 1.0;
+    // Bevy rechnet: Belichtung = Kurve(Helligkeit) - Helligkeit
+    let target = |x: f32| (STRENGTH * (REFERENCE - x)).clamp(-MAX_EV, MAX_EV);
+    let points = [AE_RANGE.0, REFERENCE - MAX_EV / STRENGTH, REFERENCE + MAX_EV / STRENGTH, AE_RANGE.1]
+        .map(|x| Vec2::new(x, target(x) + x));
+    AutoExposureCompensationCurve::from_curve(LinearSpline::new(points)).unwrap_or_else(|e| {
+        warn!("Belichtungskurve ungültig ({e}), Augen-Anpassung ohne Kurve");
+        default()
+    })
+}
+
 /// Wendet die Grafik-Einstellungen auf die Kamera und das Fenster an (beim Start und bei
 /// jeder Änderung im Grafik-Menü).
 pub fn apply_graphics(
@@ -106,6 +133,8 @@ pub fn apply_graphics(
     settings: Res<Settings>,
     cams: Query<(Entity, Ref<PlayerCamera>)>,
     mut windows: Query<&mut Window>,
+    mut curves: ResMut<Assets<AutoExposureCompensationCurve>>,
+    mut curve: Local<Option<Handle<AutoExposureCompensationCurve>>>,
 ) {
     let changed = settings.is_changed();
     if changed {
@@ -136,11 +165,13 @@ pub fn apply_graphics(
         }
         if s.auto_exposure {
             // Augen-Anpassung: dunkle Bereiche werden langsam heller, helle Lampen blenden kurz
+            let curve = curve.get_or_insert_with(|| curves.add(exposure_curve())).clone();
             ec.insert(AutoExposure {
-                range: -3.5..=3.0,
+                range: AE_RANGE.0..=AE_RANGE.1,
                 filter: 0.15..=0.92,
                 speed_brighten: 1.6,
                 speed_darken: 2.2,
+                compensation_curve: curve,
                 ..default()
             });
         } else {
@@ -148,7 +179,7 @@ pub fn apply_graphics(
         }
         if s.film {
             ec.insert((
-                grading(s.auto_exposure),
+                grading(),
                 Vignette {
                     intensity: 0.3,
                     radius: 0.95,
@@ -164,7 +195,7 @@ pub fn apply_graphics(
         } else {
             ec.remove::<(Vignette, ChromaticAberration)>();
             let mut g = ColorGrading::default();
-            g.global.exposure = if s.auto_exposure { -1.1 } else { 0.35 };
+            g.global.exposure = BASE_EXPOSURE;
             ec.insert(g);
         }
     }

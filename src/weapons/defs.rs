@@ -77,6 +77,7 @@ pub struct WeaponDef {
     /// Waffenposition (Kameraraum, Meter) in der Hüfte und beim Zielen
     pub hip: Vec3,
     pub ads: Vec3,
+    /// Zielfernrohr: beim Zielen wird die Ego-Waffe ausgeblendet und das Fernrohrbild gezeigt
     pub scope: bool,
 }
 
@@ -122,7 +123,9 @@ const fn pap(damage_mult: f32, mag: u32, reserve: u32) -> PapStats {
 }
 
 const RIFLE_HIP: Vec3 = Vec3::new(0.12, -0.11, -0.25);
-const RIFLE_ADS: Vec3 = Vec3::new(0.0, -0.0, -0.17);
+/// Beim Zielen sitzt die Kimme gut 15 cm vor dem Auge (real eher 8 cm): so verdecken Kimme,
+/// Gehäuse und Hände nicht die halbe Sicht, das Korn bleibt fast so groß wie vorher.
+const RIFLE_ADS: Vec3 = Vec3::new(0.0, 0.0, -0.25);
 const PISTOL_HIP: Vec3 = Vec3::new(0.105, -0.092, -0.34);
 const PISTOL_ADS: Vec3 = Vec3::new(0.0, 0.0, -0.42);
 

@@ -6,6 +6,7 @@
 //! * `TR_SCRIPT="1:key=W;3:key=-W"` – einfache Tasten-Skripte (siehe `ScriptStep`)
 //! * `TR_GOD=1` – Spieler unverwundbar
 //! * `TR_ROUND=10` – mit Runde N starten, `TR_POINTS=50000` – Startpunkte
+//! * `TR_PLAYERS=2` – Schwierigkeit für N Spieler (siehe `game::balance`)
 //! * `TR_SKIPMENU=1` – Hauptmenü überspringen, `TR_NOINPUT=1` – echte Eingaben ignorieren
 //! * `TR_POWER=1` – Strom ist von Anfang an eingeschaltet
 //! * `TR_MENUSHOT=/pfad/menu.png` – Screenshot des Hauptmenüs nach 1,5 s
@@ -56,6 +57,8 @@ pub struct DebugConfig {
     pub god: bool,
     pub start_round: Option<u32>,
     pub start_points: Option<u32>,
+    /// Spielerzahl für die Schwierigkeit (TR_PLAYERS)
+    pub players: Option<u32>,
     /// Strom von Anfang an eingeschaltet (TR_POWER)
     pub start_power: bool,
     pub elapsed: f32,
@@ -141,6 +144,7 @@ impl DebugConfig {
         c.god = std::env::var("TR_GOD").is_ok();
         c.start_round = std::env::var("TR_ROUND").ok().and_then(|s| s.parse().ok());
         c.start_points = std::env::var("TR_POINTS").ok().and_then(|s| s.parse().ok());
+        c.players = std::env::var("TR_PLAYERS").ok().and_then(|s| s.parse().ok());
         c.start_power = std::env::var("TR_POWER").is_ok();
         c.active = !c.shots.is_empty() || c.exit_at.is_some() || !c.script.is_empty();
         c.no_input = c.active || std::env::var("TR_NOINPUT").is_ok();

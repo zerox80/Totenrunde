@@ -6,7 +6,7 @@ use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions};
 
-use super::Player;
+use super::{CameraFov, Player};
 use crate::base::debug::DebugConfig;
 use crate::base::settings::Settings;
 use crate::base::InGame;
@@ -28,6 +28,7 @@ pub fn mouse_look(
     settings: Res<Settings>,
     ingame: Res<InGame>,
     time: Res<Time>,
+    fov: Query<&CameraFov>,
     mut player: Single<(&mut Player, &mut Transform)>,
 ) {
     let (ref mut p, ref mut tf) = *player;
@@ -35,7 +36,11 @@ pub fn mouse_look(
         return;
     }
     let dt = time.delta_secs();
-    let sens = settings.sensitivity * 0.0022 * (1.0 - p.ads * (1.0 - settings.ads_sensitivity));
+    // Starke Vergrößerung (Zielfernrohr) zusätzlich mit dem Zoom verlangsamen; Kimme und
+    // Korn (Zoom ab 0.75) behalten die eingestellte Ziel-Empfindlichkeit.
+    let zoom = fov.iter().next().map(|f| f.current / settings.fov_deg.to_radians()).unwrap_or(1.0);
+    let scope = (zoom / 0.75).min(1.0);
+    let sens = settings.sensitivity * 0.0022 * (1.0 - p.ads * (1.0 - settings.ads_sensitivity)) * scope;
     let d = if cfg.no_input { Vec2::ZERO } else { motion.delta };
     p.yaw -= d.x * sens;
     p.pitch -= d.y * sens * if settings.invert_y { -1.0 } else { 1.0 };

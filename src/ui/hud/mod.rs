@@ -2,7 +2,7 @@
 //!   * unten links: Rundenzahl in roter Kreide (Runde 1–5 als Strichliste), darüber Perks
 //!   * unten rechts: Punkte mit aufsteigenden Änderungen, Munition, Granaten, Waffenname
 //!   * unten Mitte: aktive Power-ups mit Restzeit, darüber der Hinweistext (Taste F)
-//!   * roter Bildschirmrand bei Schaden, Fadenkreuz, FPS-Anzeige (F3)
+//!   * roter Bildschirmrand bei Schaden, Fadenkreuz, Fernrohrbild, FPS-Anzeige (F3)
 
 mod ammo;
 mod damage;
@@ -10,6 +10,7 @@ mod points;
 mod powerups;
 mod prompt;
 mod round;
+mod scope;
 mod widgets;
 
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
@@ -34,6 +35,7 @@ impl Plugin for HudPlugin {
                     powerups::spawn,
                     prompt::spawn,
                     damage::spawn,
+                    scope::spawn,
                 ),
             )
             .add_systems(
@@ -48,6 +50,7 @@ impl Plugin for HudPlugin {
                     powerups::update,
                     prompt::update,
                     damage::update,
+                    scope::update,
                     crosshair_visibility,
                 )
                     .in_set(GameSet::Ui)

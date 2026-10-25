@@ -2,7 +2,8 @@
 //!
 //! Drop-Logik wie im Original: Sobald die insgesamt verdienten Punkte eine steigende
 //! Schwelle (2000, x1.14) überschreiten, lässt der nächste getötete Zombie ein Power-up
-//! fallen; zusätzlich 2 % Zufall. Höchstens 4 Drops pro Runde.
+//! fallen; zusätzlich 2 % Zufall. Höchstens 4 Drops pro Runde. Solo: Schwelle 1500 (x1.1)
+//! und 5 % Zufall (siehe `balance`).
 
 pub mod drops;
 pub mod effects;
@@ -11,6 +12,7 @@ use bevy::prelude::*;
 use rand::seq::SliceRandom;
 
 use crate::base::{AppState, GameSet, InGame};
+use crate::game::balance::Balance;
 
 pub use drops::spawn_powerup;
 
@@ -115,10 +117,10 @@ fn shuffled_cycle() -> Vec<PowerupKind> {
     v
 }
 
-fn reset_powerups(mut commands: Commands) {
+fn reset_powerups(mut commands: Commands, bal: Res<Balance>) {
     commands.insert_resource(ActivePowerups {
-        next_drop_score: 2000,
-        increment: 2000.0,
+        next_drop_score: bal.drop_first,
+        increment: bal.drop_first as f64,
         cycle: shuffled_cycle(),
         ..default()
     });

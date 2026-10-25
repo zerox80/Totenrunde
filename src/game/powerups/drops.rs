@@ -6,6 +6,7 @@ use rand::Rng;
 use super::{ActivePowerups, Powerup, PowerupKind, LIFETIME};
 use crate::audio::{Sfx, SfxEvent};
 use crate::base::AppState;
+use crate::game::balance::Balance;
 use crate::game::points::Score;
 use crate::world::nav::NavGrid;
 use crate::zombies::{DamageKind, ZombieKilled};
@@ -42,6 +43,7 @@ pub fn drop_powerups(
     asset_server: Res<AssetServer>,
     mut killed: MessageReader<ZombieKilled>,
     mut pu: ResMut<ActivePowerups>,
+    bal: Res<Balance>,
     score: Res<Score>,
     nav: Res<NavGrid>,
     mut sfx: MessageWriter<SfxEvent>,
@@ -56,12 +58,12 @@ pub fn drop_powerups(
             continue;
         }
         let by_score = score.earned >= pu.next_drop_score;
-        let by_chance = rng.random::<f32>() < 0.02;
+        let by_chance = rng.random::<f32>() < bal.drop_chance;
         if !(by_score || by_chance) {
             continue;
         }
         if by_score {
-            pu.increment *= 1.14;
+            pu.increment *= bal.drop_growth;
             pu.next_drop_score = score.earned + pu.increment as u64;
         }
         pu.drops_this_round += 1;

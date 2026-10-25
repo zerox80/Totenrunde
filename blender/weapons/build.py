@@ -35,7 +35,7 @@ BUILDERS = {
 }
 
 
-def preview_render(name, path, hip=(0.105, -0.092, -0.34), ads=(0.0, 0.0, -0.17)):
+def preview_render(name, path, hip=(0.105, -0.092, -0.34), ads=(0.0, 0.0, -0.25)):
     """Kontrollbilder: Ego-Ansicht (wie im Spiel, Hüfte) und Seitenansicht."""
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
@@ -107,7 +107,7 @@ def main():
         if prev:
             pistol = n in ("m1911", "b23r", "python", "raygun")
             hip = (0.105, -0.092, -0.34) if pistol else ((0.14, -0.14, -0.27) if n == "rpd" else (0.12, -0.11, -0.25))
-            ads = (0.0, 0.0, -0.42) if pistol else ((0.0, 0.0, -0.12) if n == "dsr50" else (0.0, 0.0, -0.17))
+            ads = (0.0, 0.0, -0.42) if pistol else ((0.0, 0.0, -0.12) if n == "dsr50" else (0.0, 0.0, -0.25))
             preview_render(n, os.path.join(PREVIEW_DIR, f"w_{n}.png"), hip=hip, ads=ads)
         print("WAFFE", n)
 

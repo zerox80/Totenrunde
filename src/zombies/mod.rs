@@ -51,7 +51,6 @@ impl Plugin for ZombiePlugin {
 
 pub const ZOMBIE_RADIUS: f32 = 0.3;
 pub const ATTACK_RANGE: f32 = 1.25;
-pub const ATTACK_DAMAGE: f32 = 50.0;
 pub const MAX_ALIVE: usize = 24;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

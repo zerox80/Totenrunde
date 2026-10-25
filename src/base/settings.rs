@@ -16,7 +16,8 @@ pub struct Settings {
     pub master_volume: f32,
     pub music_volume: f32,
     pub head_bob: f32,
-    /// Echtzeit-Schatten (Mond, flackernde Lampen); statische Schatten stecken in den Lightmaps
+    /// Echtzeit-Schatten der flackernden Lampen und Feuer; statische Schatten (auch die des
+    /// Mondes) stecken in den Lightmaps
     pub shadows: bool,
     /// Kantenglättung: 0 = aus, 1 = FXAA, 2/4 = MSAA
     pub msaa: u32,

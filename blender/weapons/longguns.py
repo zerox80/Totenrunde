@@ -1,8 +1,9 @@
 """Langwaffen und Maschinenpistolen mit realistischen Einzelteilen und Ego-Armen.
 
 Jede Waffe wird in natürlichen Koordinaten modelliert (Visierlinie z = 0) und dann um
-`shift` nach vorn verschoben, damit beim Zielen der Abstand Auge–Kimme und Auge–Griff
-realistisch ist (Kamera bei y = -0.17 in Zielhaltung).
+`shift` nach vorn verschoben, damit die Abstände Auge–Kimme und Auge–Griff zueinander passen.
+Arme und Griffe sind für eine Kamera bei y = -0.17 posiert; im Spiel sitzt die Kamera beim
+Zielen bei y = -0.25, damit Kimme und Gehäuse nicht die halbe Sicht verdecken.
 """
 
 import math

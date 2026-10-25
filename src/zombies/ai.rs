@@ -6,7 +6,8 @@ use std::f32::consts::PI;
 use bevy::prelude::*;
 use rand::Rng;
 
-use super::{SpeedClass, ZState, Zombie, ATTACK_DAMAGE, ATTACK_RANGE, ZOMBIE_RADIUS};
+use super::{SpeedClass, ZState, Zombie, ATTACK_RANGE, ZOMBIE_RADIUS};
+use crate::game::balance::Balance;
 use crate::player::{Player, PlayerDamage};
 use crate::world::barricades::Barricades;
 use crate::world::collision::{CollisionWorld, F_ZOMBIE};
@@ -38,6 +39,7 @@ pub fn zombie_ai(
     col: Res<CollisionWorld>,
     nav: Res<NavGrid>,
     mut barricades: ResMut<Barricades>,
+    bal: Res<Balance>,
     player: Single<(&Transform, &Player), Without<Zombie>>,
     mut zombies: Query<(Entity, &mut Zombie, &mut Transform)>,
     mut dmg: MessageWriter<PlayerDamage>,
@@ -234,7 +236,7 @@ pub fn zombie_ai(
                     };
                     if reach && !player_downed {
                         dmg.write(PlayerDamage {
-                            amount: ATTACK_DAMAGE,
+                            amount: bal.zombie_damage,
                             from: pos,
                         });
                     }
