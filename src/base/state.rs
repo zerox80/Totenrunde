@@ -38,7 +38,10 @@ impl Plugin for StatePlugin {
         app.add_systems(Update, finish_loading.run_if(in_state(AppState::Loading)))
             .add_systems(OnEnter(AppState::Playing), start_game)
             .add_systems(OnExit(AppState::Playing), end_game)
-            .add_systems(Update, (tick_game, toggle_pause).run_if(in_state(AppState::Playing)));
+            .add_systems(
+                Update,
+                (tick_game, toggle_pause).run_if(in_state(AppState::Playing)),
+            );
     }
 }
 
@@ -50,7 +53,11 @@ fn finish_loading(
 ) {
     if map.is_some() && assets.is_some() {
         // Für automatische Tests direkt ins Spiel, sonst ins Hauptmenü
-        next.set(if cfg.skip_menu { AppState::Playing } else { AppState::Menu });
+        next.set(if cfg.skip_menu {
+            AppState::Playing
+        } else {
+            AppState::Menu
+        });
     }
 }
 

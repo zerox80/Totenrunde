@@ -23,7 +23,9 @@ pub fn apply_damage(
     mut fx: MessageWriter<FxEvent>,
 ) {
     for h in hits.read() {
-        let Ok((mut z, tf, rig)) = zombies.get_mut(h.zombie) else { continue };
+        let Ok((mut z, tf, rig)) = zombies.get_mut(h.zombie) else {
+            continue;
+        };
         if !z.alive() {
             continue;
         }
@@ -69,7 +71,9 @@ pub fn apply_damage(
         z.death_back = fwd.dot(h.dir) < 0.0;
         z.state = ZState::Dying { t: 0.0 };
         z.vel = Vec3::ZERO;
-        if h.part == HitPart::Head && (h.kind == DamageKind::Bullet || h.kind == DamageKind::Explosive) {
+        if h.part == HitPart::Head
+            && (h.kind == DamageKind::Bullet || h.kind == DamageKind::Explosive)
+        {
             z.headless = true;
             if let Some(rig) = rig {
                 if let Some(hm) = rig.head_mesh {

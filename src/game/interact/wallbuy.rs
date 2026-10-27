@@ -5,12 +5,12 @@ use std::f32::consts::FRAC_PI_2;
 
 use bevy::prelude::*;
 
-use super::{cost_text, try_buy, Focus, InteractKind, Interactable, Prompt};
+use super::{Focus, InteractKind, Interactable, Prompt, cost_text, try_buy};
 use crate::audio::SfxEvent;
 use crate::base::AppState;
 use crate::game::points::Score;
-use crate::weapons::{def, weapon_index, GiveWeapon, Loadout};
-use crate::world::mapdata::{asset_root, MapFile};
+use crate::weapons::{GiveWeapon, Loadout, def, weapon_index};
+use crate::world::mapdata::{MapFile, asset_exists};
 
 pub const UPGRADED_AMMO_COST: u32 = 4500;
 
@@ -59,7 +59,7 @@ pub fn spawn_wallbuys(
         // Kreideumriss: eigenes Modell (Blender) oder ein Rahmen aus Kreidestrichen
         let chalk_model = format!("models/chalk_{}.gltf", spec.weapon);
         let chalk_tf = Transform::from_translation(pos + fwd * 0.012).with_rotation(rot);
-        if asset_root().join(&chalk_model).exists() {
+        if asset_exists(&chalk_model) {
             commands.spawn((
                 Chalk { point },
                 WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(chalk_model))),
@@ -72,13 +72,17 @@ pub fn spawn_wallbuys(
                 (Vec3::new(0.0, 0.2, 0.0), Vec3::new(len, 0.02, 0.002)),
                 (Vec3::new(0.0, -0.2, 0.0), Vec3::new(len, 0.02, 0.002)),
                 (Vec3::new(len / 2.0, 0.0, 0.0), Vec3::new(0.02, 0.42, 0.002)),
-                (Vec3::new(-len / 2.0, 0.0, 0.0), Vec3::new(0.02, 0.42, 0.002)),
+                (
+                    Vec3::new(-len / 2.0, 0.0, 0.0),
+                    Vec3::new(0.02, 0.42, 0.002),
+                ),
             ] {
                 commands.spawn((
                     Chalk { point },
                     Mesh3d(meshes.add(Cuboid::from_size(size))),
                     MeshMaterial3d(chalk_mat.clone()),
-                    Transform::from_translation(pos + fwd * 0.012 + right * c.x + Vec3::Y * c.y).with_rotation(rot),
+                    Transform::from_translation(pos + fwd * 0.012 + right * c.x + Vec3::Y * c.y)
+                        .with_rotation(rot),
                     DespawnOnExit(AppState::Playing),
                 ));
             }
@@ -91,8 +95,11 @@ pub fn spawn_wallbuys(
             .spawn((
                 Name::new("Wandwaffe Modell"),
                 super::WorldWeapon,
-                WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(def(w).model()))),
-                Transform::from_translation(pos + fwd * 0.05).with_rotation(rot * Quat::from_rotation_y(FRAC_PI_2)),
+                WorldAssetRoot(
+                    asset_server.load(GltfAssetLabel::Scene(0).from_asset(def(w).model())),
+                ),
+                Transform::from_translation(pos + fwd * 0.05)
+                    .with_rotation(rot * Quat::from_rotation_y(FRAC_PI_2)),
                 DespawnOnExit(AppState::Playing),
             ))
             .observe(super::hide_weapon_hands);
@@ -105,12 +112,20 @@ pub fn chalk_glow(
     chalks: Query<(&Chalk, &MeshMaterial3d<StandardMaterial>)>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let focused = focus.entity.and_then(|e| items.get(e).ok()).map(|i| i.point);
+    let focused = focus
+        .entity
+        .and_then(|e| items.get(e).ok())
+        .map(|i| i.point);
     for (c, m) in chalks.iter() {
-        let on = focused.map(|p| p.distance(Vec3::new(c.point.x, 1.0, c.point.z)) < 0.1).unwrap_or(false);
+        let on = focused
+            .map(|p| p.distance(Vec3::new(c.point.x, 1.0, c.point.z)) < 0.1)
+            .unwrap_or(false);
         let k = if on { 0.7 } else { 0.22 };
         // erst lesen, nur bei Änderung schreiben (get_mut markiert das Material als geändert)
-        let differs = materials.get(&m.0).map(|mat| (mat.emissive.red - k).abs() > 0.01).unwrap_or(false);
+        let differs = materials
+            .get(&m.0)
+            .map(|mat| (mat.emissive.red - k).abs() > 0.01)
+            .unwrap_or(false);
         if differs {
             if let Some(mut mat) = materials.get_mut(&m.0) {
                 mat.emissive = LinearRgba::rgb(k, k, k * 0.95);
@@ -127,27 +142,40 @@ pub fn use_wallbuy(
     mut give: MessageWriter<GiveWeapon>,
     mut sfx: MessageWriter<SfxEvent>,
 ) {
-    let Some(InteractKind::WallBuy(w)) = focus.kind else { return };
+    let Some(InteractKind::WallBuy(w)) = focus.kind else {
+        return;
+    };
     let d = def(w);
     match lo.has(w) {
         Some(i) => {
             let slot = lo.slots[i];
-            let cost = if slot.upgraded { UPGRADED_AMMO_COST } else { d.ammo_cost() };
-            let full = slot.reserve >= d.reserve_size(slot.upgraded) && slot.mag >= d.mag_size(slot.upgraded);
+            let cost = if slot.upgraded {
+                UPGRADED_AMMO_COST
+            } else {
+                d.ammo_cost()
+            };
+            let full = slot.reserve >= d.reserve_size(slot.upgraded)
+                && slot.mag >= d.mag_size(slot.upgraded);
             if full {
                 prompt.set(format!("{} – Munition voll", d.display_name(slot.upgraded)));
                 return;
             }
             prompt.set(format!("Halte F für Munition {}", cost_text(cost)));
             if focus.pressed && try_buy(&mut score, cost, &mut sfx) {
-                give.write(GiveWeapon { weapon: w, upgraded: slot.upgraded });
+                give.write(GiveWeapon {
+                    weapon: w,
+                    upgraded: slot.upgraded,
+                });
                 focus.pressed = false;
             }
         }
         None => {
             prompt.set(format!("Halte F für {} {}", d.name, cost_text(d.wall_cost)));
             if focus.pressed && try_buy(&mut score, d.wall_cost, &mut sfx) {
-                give.write(GiveWeapon { weapon: w, upgraded: false });
+                give.write(GiveWeapon {
+                    weapon: w,
+                    upgraded: false,
+                });
                 focus.pressed = false;
             }
         }

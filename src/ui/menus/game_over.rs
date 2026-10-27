@@ -2,9 +2,9 @@
 
 use bevy::prelude::*;
 
-use super::widgets::{button, root, text, MenuAction, BLOOD};
-use crate::base::assets::GameAssets;
+use super::widgets::{BLOOD, MenuAction, button, root, text};
 use crate::base::AppState;
+use crate::base::assets::GameAssets;
 use crate::game::points::Score;
 use crate::game::rounds::Rounds;
 
@@ -17,7 +17,12 @@ impl Plugin for GameOverPlugin {
     }
 }
 
-fn spawn(mut commands: Commands, assets: Res<GameAssets>, score: Option<Res<Score>>, rounds: Option<Res<Rounds>>) {
+fn spawn(
+    mut commands: Commands,
+    assets: Res<GameAssets>,
+    score: Option<Res<Score>>,
+    rounds: Option<Res<Rounds>>,
+) {
     commands.spawn((Camera2d, DespawnOnExit(AppState::GameOver)));
     let round = rounds.map(|r| r.round).unwrap_or(1);
     let survived = if round == 1 {
@@ -38,11 +43,19 @@ fn spawn(mut commands: Commands, assets: Res<GameAssets>, score: Option<Res<Scor
         None => vec![],
     };
     commands
-        .spawn((root(Color::srgb(0.03, 0.0, 0.0)), DespawnOnExit(AppState::GameOver)))
+        .spawn((
+            root(Color::srgb(0.03, 0.0, 0.0)),
+            DespawnOnExit(AppState::GameOver),
+        ))
         .with_children(|p| {
             p.spawn(text("SPIEL VORBEI", &assets.font_black, 84.0, BLOOD));
             p.spawn((
-                text(survived, &assets.font_bold, 30.0, Color::srgb(0.9, 0.88, 0.84)),
+                text(
+                    survived,
+                    &assets.font_bold,
+                    30.0,
+                    Color::srgb(0.9, 0.88, 0.84),
+                ),
                 Node {
                     margin: UiRect::bottom(px(36)),
                     ..default()
@@ -62,8 +75,18 @@ fn spawn(mut commands: Commands, assets: Res<GameAssets>, score: Option<Res<Scor
                         ..default()
                     })
                     .with_children(|row| {
-                        row.spawn(text(k, &assets.font_regular, 22.0, Color::srgba(1.0, 1.0, 1.0, 0.7)));
-                        row.spawn(text(v, &assets.font_bold, 22.0, Color::srgb(0.95, 0.93, 0.9)));
+                        row.spawn(text(
+                            k,
+                            &assets.font_regular,
+                            22.0,
+                            Color::srgba(1.0, 1.0, 1.0, 0.7),
+                        ));
+                        row.spawn(text(
+                            v,
+                            &assets.font_bold,
+                            22.0,
+                            Color::srgb(0.95, 0.93, 0.9),
+                        ));
                     });
                 }
             });

@@ -118,7 +118,11 @@ pub fn env(mut x: Vec<f32>, e: impl Fn(f32, f32) -> f32) -> Vec<f32> {
 /// Exponentieller Abfall mit kurzem Anschlag
 pub fn decay(attack: f32, tau: f32) -> impl Fn(f32, f32) -> f32 {
     move |t, _| {
-        let a = if attack > 0.0 { (t / attack).min(1.0) } else { 1.0 };
+        let a = if attack > 0.0 {
+            (t / attack).min(1.0)
+        } else {
+            1.0
+        };
         a * (-(t - attack).max(0.0) / tau).exp()
     }
 }
@@ -138,7 +142,9 @@ pub fn ahr(a: f32, h: f32, r: f32) -> impl Fn(f32, f32) -> f32 {
 
 /// Ein-/Ausblenden an den Rändern (gegen Knackser)
 pub fn fade(x: Vec<f32>, fi: f32, fo: f32) -> Vec<f32> {
-    env(x, move |t, d| (t / fi.max(1e-4)).min(1.0) * ((d - t) / fo.max(1e-4)).min(1.0))
+    env(x, move |t, d| {
+        (t / fi.max(1e-4)).min(1.0) * ((d - t) / fo.max(1e-4)).min(1.0)
+    })
 }
 
 pub fn gain(mut x: Vec<f32>, g: f32) -> Vec<f32> {
@@ -202,12 +208,33 @@ pub fn biquad_sweep(mut x: Vec<f32>, kind: Filt, freq: impl Fn(f32) -> f32, q: f
         let (sn, cs) = w.sin_cos();
         let alpha = sn / (2.0 * q);
         let (b0, b1, b2, a0, a1, a2) = match kind {
-            Filt::Low => ((1.0 - cs) / 2.0, 1.0 - cs, (1.0 - cs) / 2.0, 1.0 + alpha, -2.0 * cs, 1.0 - alpha),
-            Filt::High => ((1.0 + cs) / 2.0, -(1.0 + cs), (1.0 + cs) / 2.0, 1.0 + alpha, -2.0 * cs, 1.0 - alpha),
+            Filt::Low => (
+                (1.0 - cs) / 2.0,
+                1.0 - cs,
+                (1.0 - cs) / 2.0,
+                1.0 + alpha,
+                -2.0 * cs,
+                1.0 - alpha,
+            ),
+            Filt::High => (
+                (1.0 + cs) / 2.0,
+                -(1.0 + cs),
+                (1.0 + cs) / 2.0,
+                1.0 + alpha,
+                -2.0 * cs,
+                1.0 - alpha,
+            ),
             Filt::Band => (alpha, 0.0, -alpha, 1.0 + alpha, -2.0 * cs, 1.0 - alpha),
             Filt::Peak(db) => {
                 let a = 10f32.powf(db / 40.0);
-                (1.0 + alpha * a, -2.0 * cs, 1.0 - alpha * a, 1.0 + alpha / a, -2.0 * cs, 1.0 - alpha / a)
+                (
+                    1.0 + alpha * a,
+                    -2.0 * cs,
+                    1.0 - alpha * a,
+                    1.0 + alpha / a,
+                    -2.0 * cs,
+                    1.0 - alpha / a,
+                )
             }
         };
         let y = (b0 * *s + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0;

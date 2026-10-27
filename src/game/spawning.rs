@@ -9,7 +9,13 @@ use crate::world::mapdata::MapFile;
 use crate::world::zones::Zones;
 
 /// Wählt einen Spawner in einer aktiven Zone (Zone des Spielers + angrenzende offene Zonen).
-pub fn pick_spawner(map: &MapFile, zones: &Zones, barricades: &Barricades, ppos: Vec3, rng: &mut impl Rng) -> Option<usize> {
+pub fn pick_spawner(
+    map: &MapFile,
+    zones: &Zones,
+    barricades: &Barricades,
+    ppos: Vec3,
+    rng: &mut impl Rng,
+) -> Option<usize> {
     let active = zones.active_zones();
     let mut cands: Vec<(usize, f32)> = Vec::new();
     for (i, sp) in map.spawners.iter().enumerate() {
@@ -24,7 +30,10 @@ pub fn pick_spawner(map: &MapFile, zones: &Zones, barricades: &Barricades, ppos:
             }
         } else if let Some(b) = sp.barricade {
             // Fenster mit wartenden Zombies weniger bevorzugen
-            if b < barricades.list.len() && barricades.list[b].occupant.is_some() && rng.random::<f32>() < 0.5 {
+            if b < barricades.list.len()
+                && barricades.list[b].occupant.is_some()
+                && rng.random::<f32>() < 0.5
+            {
                 continue;
             }
         }

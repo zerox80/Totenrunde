@@ -12,7 +12,7 @@ use bevy::world_serialization::WorldInstanceReady;
 use rand::Rng;
 
 use super::assets::WeaponAssets;
-use super::defs::{def, WeaponClass};
+use super::defs::{WeaponClass, def};
 use super::loadout::{Loadout, WState};
 use crate::player::{Player, PlayerCamera};
 
@@ -63,7 +63,9 @@ pub fn spawn_viewmodel(
     let knife = commands
         .spawn((
             Name::new("Messer"),
-            WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/weapons/knife.gltf"))),
+            WorldAssetRoot(
+                asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/weapons/knife.gltf")),
+            ),
             Transform::from_xyz(-0.1, -0.1, -0.2),
             Visibility::Hidden,
         ))
@@ -119,8 +121,13 @@ pub fn sync_viewmodel(
         if let Some((w, up)) = want {
             let e = commands
                 .spawn((
-                    ViewModelScene { weapon: w, upgraded: up },
-                    WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(def(w).model()))),
+                    ViewModelScene {
+                        weapon: w,
+                        upgraded: up,
+                    },
+                    WorldAssetRoot(
+                        asset_server.load(GltfAssetLabel::Scene(0).from_asset(def(w).model())),
+                    ),
                     Transform::IDENTITY,
                     ChildOf(re),
                 ))
@@ -141,17 +148,26 @@ fn on_vm_ready(
     scenes: Query<&ViewModelScene>,
     wa: Res<WeaponAssets>,
 ) {
-    let upgraded = scenes.get(ready.entity).map(|s| s.upgraded).unwrap_or(false);
+    let upgraded = scenes
+        .get(ready.entity)
+        .map(|s| s.upgraded)
+        .unwrap_or(false);
     let mut parts = ViewModelParts::default();
     for e in children.iter_descendants(ready.entity) {
         if meshes.contains(e) {
             // Keine Weltschatten auf Waffe und Händen: sie sähen sonst je nach Grafikstufe
             // und Standort (z. B. Mondschatten unter Dächern) fast schwarz aus.
-            commands.entity(e).insert((NotShadowCaster, NotShadowReceiver));
+            commands
+                .entity(e)
+                .insert((NotShadowCaster, NotShadowReceiver));
             if upgraded {
                 let keep = mats
                     .get(e)
-                    .map(|m| m.0.starts_with("W_Hand") || m.0.starts_with("W_Sleeve") || m.0.starts_with("W_Glow"))
+                    .map(|m| {
+                        m.0.starts_with("W_Hand")
+                            || m.0.starts_with("W_Sleeve")
+                            || m.0.starts_with("W_Glow")
+                    })
                     .unwrap_or(false);
                 if !keep {
                     commands.entity(e).insert(MeshMaterial3d(wa.camo.clone()));
@@ -190,10 +206,16 @@ pub fn animate_viewmodel(
     time: Res<Time>,
     motion: Res<AccumulatedMouseMotion>,
     player: Single<(&Player, &Loadout)>,
-    mut roots: Query<(&mut ViewModelRoot, &mut Transform, &mut Visibility), Without<ViewModelScene>>,
+    mut roots: Query<
+        (&mut ViewModelRoot, &mut Transform, &mut Visibility),
+        Without<ViewModelScene>,
+    >,
     scenes: Query<&ViewModelParts>,
     mut part_tfs: Query<&mut Transform, (Without<ViewModelRoot>, Without<MuzzleFlash>)>,
-    mut flashes: Query<(&mut Transform, &mut Visibility), (With<MuzzleFlash>, Without<ViewModelRoot>)>,
+    mut flashes: Query<
+        (&mut Transform, &mut Visibility),
+        (With<MuzzleFlash>, Without<ViewModelRoot>),
+    >,
     mut lights: Query<&mut PointLight, With<MuzzleLight>>,
     mut vis: Query<&mut Visibility, (Without<MuzzleFlash>, Without<ViewModelRoot>)>,
 ) {
@@ -210,21 +232,37 @@ pub fn animate_viewmodel(
         };
         let d = def(slot.weapon);
         let scoped = d.scope && lo.ads > SCOPE_IN;
-        root_vis.set_if_neq(if scoped { Visibility::Hidden } else { Visibility::Inherited });
+        root_vis.set_if_neq(if scoped {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        });
         let ads = ease(lo.ads);
         let mut pos = d.hip.lerp(d.ads, ads);
         let mut rot = Quat::IDENTITY;
 
         // Mausträgheit
         let target_sway = Vec2::new(-motion.delta.x, -motion.delta.y) * 0.0006 * (1.0 - ads * 0.85);
-        root.sway = root.sway.lerp(target_sway.clamp(Vec2::splat(-0.04), Vec2::splat(0.04)), (dt * 10.0).min(1.0));
+        root.sway = root.sway.lerp(
+            target_sway.clamp(Vec2::splat(-0.04), Vec2::splat(0.04)),
+            (dt * 10.0).min(1.0),
+        );
         pos += Vec3::new(root.sway.x, root.sway.y, 0.0);
-        rot *= Quat::from_euler(EulerRot::YXZ, root.sway.x * 2.0, root.sway.y * 1.5, root.sway.x * 1.5);
+        rot *= Quat::from_euler(
+            EulerRot::YXZ,
+            root.sway.x * 2.0,
+            root.sway.y * 1.5,
+            root.sway.x * 1.5,
+        );
 
         // Wippen beim Laufen
         let bob = pl.bob * (1.0 - ads * 0.92);
         let ph = pl.bob_phase;
-        pos += Vec3::new(ph.sin() * 0.012 * bob, -(ph * 2.0).sin().abs() * 0.01 * bob, 0.0);
+        pos += Vec3::new(
+            ph.sin() * 0.012 * bob,
+            -(ph * 2.0).sin().abs() * 0.01 * bob,
+            0.0,
+        );
         rot *= Quat::from_rotation_z(ph.sin() * 0.02 * bob);
         // Atmen
         let breathe = (root.time * 1.6).sin() * 0.0025 * (1.0 - ads * 0.8);
@@ -259,7 +297,13 @@ pub fn animate_viewmodel(
                 rot *= Quat::from_euler(EulerRot::YXZ, 0.2 * w, 0.25 * w, -0.45 * w);
                 // Magazin raus / rein
                 if u > 0.2 && u < 0.75 {
-                    let m = if u < 0.35 { (u - 0.2) / 0.15 } else if u < 0.55 { 1.0 } else { 1.0 - (u - 0.55) / 0.2 };
+                    let m = if u < 0.35 {
+                        (u - 0.2) / 0.15
+                    } else if u < 0.55 {
+                        1.0
+                    } else {
+                        1.0 - (u - 0.55) / 0.2
+                    };
                     mag_off = ease(m) * 0.25;
                     mag_hidden = u > 0.33 && u < 0.5;
                 }
@@ -302,15 +346,26 @@ pub fn animate_viewmodel(
 
         // Messer
         if let Ok(mut v) = vis.get_mut(root.knife) {
-            *v = if matches!(lo.state, WState::Melee { .. }) { Visibility::Inherited } else { Visibility::Hidden };
+            *v = if matches!(lo.state, WState::Melee { .. }) {
+                Visibility::Inherited
+            } else {
+                Visibility::Hidden
+            };
         }
         if let WState::Melee { t, .. } = lo.state {
             if let Ok(mut ktf) = part_tfs.get_mut(root.knife) {
                 let u = (t / 0.55).min(1.0);
-                let swing = if u < 0.25 { u / 0.25 } else { 1.0 - ((u - 0.25) / 0.75) };
+                let swing = if u < 0.25 {
+                    u / 0.25
+                } else {
+                    1.0 - ((u - 0.25) / 0.75)
+                };
                 let a = ease(u.min(0.4) / 0.4);
-                ktf.translation = Vec3::new(0.25 - 0.45 * a, -0.12 + 0.05 * swing, -0.32 - 0.08 * swing) - pos;
-                ktf.rotation = Quat::from_euler(EulerRot::YXZ, 0.9 - 1.6 * a, 0.1, -1.2 + 0.4 * swing) * rot.inverse();
+                ktf.translation =
+                    Vec3::new(0.25 - 0.45 * a, -0.12 + 0.05 * swing, -0.32 - 0.08 * swing) - pos;
+                ktf.rotation =
+                    Quat::from_euler(EulerRot::YXZ, 0.9 - 1.6 * a, 0.1, -1.2 + 0.4 * swing)
+                        * rot.inverse();
             }
         }
 
@@ -320,12 +375,17 @@ pub fn animate_viewmodel(
                 if let Some((m, rest)) = parts.mag {
                     if let Ok(mut mt) = part_tfs.get_mut(m) {
                         mt.translation = rest.translation - Vec3::Y * mag_off;
-                        mt.scale = if mag_hidden { Vec3::splat(0.001) } else { rest.scale };
+                        mt.scale = if mag_hidden {
+                            Vec3::splat(0.001)
+                        } else {
+                            rest.scale
+                        };
                     }
                 }
                 if let Some((a, rest)) = parts.arm_l {
                     if let Ok(mut at) = part_tfs.get_mut(a) {
-                        at.translation = rest.translation - Vec3::new(0.0, mag_off * 0.8, mag_off * -0.3);
+                        at.translation =
+                            rest.translation - Vec3::new(0.0, mag_off * 0.8, mag_off * -0.3);
                     }
                 }
                 if let Some((sl, rest)) = parts.slide {
@@ -357,13 +417,20 @@ pub fn animate_viewmodel(
 #[derive(Component)]
 pub struct PerkBottle;
 
-pub fn spawn_bottle(mut commands: Commands, cam: Query<Entity, With<PlayerCamera>>, asset_server: Res<AssetServer>) {
+pub fn spawn_bottle(
+    mut commands: Commands,
+    cam: Query<Entity, With<PlayerCamera>>,
+    asset_server: Res<AssetServer>,
+) {
     let Ok(ce) = cam.single() else { return };
     let bottle = commands
         .spawn((
             Name::new("Perk-Flasche"),
             PerkBottle,
-            WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/weapons/perk_bottle.gltf"))),
+            WorldAssetRoot(
+                asset_server
+                    .load(GltfAssetLabel::Scene(0).from_asset("models/weapons/perk_bottle.gltf")),
+            ),
             Transform::from_scale(Vec3::splat(VM_SCALE)),
             Visibility::Hidden,
         ))
@@ -390,7 +457,8 @@ pub fn animate_bottle(
         }
         *vis = Visibility::Inherited;
         let up = ease((t / 0.5).min(1.0)) * ease(((dur - t) / 0.45).clamp(0.0, 1.0));
-        let tilt = ease(((t - 0.5) / 0.6).clamp(0.0, 1.0)) * ease(((dur - 0.45 - t) / 0.4).clamp(0.0, 1.0));
+        let tilt = ease(((t - 0.5) / 0.6).clamp(0.0, 1.0))
+            * ease(((dur - 0.45 - t) / 0.4).clamp(0.0, 1.0));
         let low = Vec3::new(0.16, -0.42, -0.36);
         let mouth = Vec3::new(0.07, -0.13, -0.33);
         tf.translation = low.lerp(mouth, up) * VM_SCALE;

@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 use rand::Rng;
 
-use super::{ActivePowerups, Powerup, PowerupKind, LIFETIME};
+use super::{ActivePowerups, LIFETIME, Powerup, PowerupKind};
 use crate::audio::{Sfx, SfxEvent};
 use crate::base::AppState;
 use crate::game::balance::Balance;
@@ -11,19 +11,30 @@ use crate::game::points::Score;
 use crate::world::nav::NavGrid;
 use crate::zombies::{DamageKind, ZombieKilled};
 
-pub fn spawn_powerup(commands: &mut Commands, asset_server: &AssetServer, kind: PowerupKind, pos: Vec3) {
+pub fn spawn_powerup(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    kind: PowerupKind,
+    pos: Vec3,
+) {
     let base = Vec3::new(pos.x, 0.0, pos.z);
     commands
         .spawn((
             Name::new(format!("Power-up {}", kind.name())),
-            Powerup { kind, age: 0.0, base },
+            Powerup {
+                kind,
+                age: 0.0,
+                base,
+            },
             Transform::from_translation(base + Vec3::Y * 0.9),
             Visibility::default(),
             DespawnOnExit(AppState::Playing),
         ))
         .with_children(|p| {
             p.spawn((
-                WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(kind.model()))),
+                WorldAssetRoot(
+                    asset_server.load(GltfAssetLabel::Scene(0).from_asset(kind.model())),
+                ),
                 Transform::IDENTITY,
             ));
             p.spawn((
@@ -88,7 +99,11 @@ pub fn animate_powerups(
         if left < 10.0 {
             let rate = if left < 4.0 { 9.0 } else { 4.0 };
             let on = (p.age * rate).fract() < 0.6;
-            *vis = if on { Visibility::Inherited } else { Visibility::Hidden };
+            *vis = if on {
+                Visibility::Inherited
+            } else {
+                Visibility::Hidden
+            };
         }
         if left <= 0.0 {
             commands.entity(e).despawn();

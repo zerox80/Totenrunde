@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 use rand::Rng;
 
-use super::{ActivePowerups, Powerup, PowerupCollected, PowerupKind, DURATION};
+use super::{ActivePowerups, DURATION, Powerup, PowerupCollected, PowerupKind};
 use crate::audio::{Sfx, SfxEvent};
 use crate::game::points::Score;
 use crate::player::Player;

@@ -22,7 +22,8 @@ pub fn spawn_decal(
     life: f32,
 ) {
     let mut rng = rand::rng();
-    let rot = Quat::from_rotation_arc(Vec3::Z, normal) * Quat::from_rotation_z(rng.random_range(0.0..6.28));
+    let rot = Quat::from_rotation_arc(Vec3::Z, normal)
+        * Quat::from_rotation_z(rng.random_range(0.0..std::f32::consts::TAU));
     commands.spawn((
         Mesh3d(fx.quad.clone()),
         MeshMaterial3d(mat.clone()),
@@ -35,7 +36,11 @@ pub fn spawn_decal(
     ));
 }
 
-pub fn update_decals(time: Res<Time>, mut commands: Commands, mut q: Query<(Entity, &mut Decal, &mut Transform)>) {
+pub fn update_decals(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut q: Query<(Entity, &mut Decal, &mut Transform)>,
+) {
     let dt = time.delta_secs();
     for (e, mut d, mut tf) in q.iter_mut() {
         d.life -= dt;

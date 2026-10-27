@@ -23,7 +23,9 @@ use crate::weapons::{Loadout, MAX_GRENADES};
 use crate::world::barricades::Barricades;
 use crate::world::mapdata::MapFile;
 use crate::world::zones::Zones;
-use crate::zombies::{spawn_zombie, SpeedClass, ZState, Zombie, ZombieKilled, ZombieSpawn, MAX_ALIVE};
+use crate::zombies::{
+    MAX_ALIVE, SpeedClass, ZState, Zombie, ZombieKilled, ZombieSpawn, spawn_zombie,
+};
 
 pub struct RoundsPlugin;
 
@@ -77,7 +79,11 @@ pub fn zombie_count(round: u32, players: u32) -> u32 {
     if round >= 10 {
         mult *= r * 0.15;
     }
-    let per_player = if players <= 1 { 0.5 } else { (players - 1) as f32 };
+    let per_player = if players <= 1 {
+        0.5
+    } else {
+        (players - 1) as f32
+    };
     let mut max = 24.0 + (per_player * 6.0 * mult).floor();
     max = match round {
         0 | 1 => (max * 0.25).floor(),
@@ -139,7 +145,12 @@ fn start_round(
     powerups::new_round(pu);
     lo.grenades = (lo.grenades + 2).min(MAX_GRENADES);
     sfx.write(SfxEvent::ui(Sfx::RoundStart));
-    info!("Runde {} beginnt: {} Zombies, {} HP", r.round, r.to_spawn, zombie_health(r.round) * bal.zombie_health);
+    info!(
+        "Runde {} beginnt: {} Zombies, {} HP",
+        r.round,
+        r.to_spawn,
+        zombie_health(r.round) * bal.zombie_health
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -192,7 +203,8 @@ fn round_logic(
             rounds.spawn_cd -= dt;
             if rounds.to_spawn > 0 && alive < MAX_ALIVE && rounds.spawn_cd <= 0.0 {
                 let mut rng = rand::rng();
-                if let Some(si) = pick_spawner(&map, &zones, &barricades, ptf.translation, &mut rng) {
+                if let Some(si) = pick_spawner(&map, &zones, &barricades, ptf.translation, &mut rng)
+                {
                     let sp = &map.spawners[si];
                     let pos = Vec3::from_array(sp.pos);
                     let to_player = ptf.translation - pos;
@@ -219,7 +231,8 @@ fn round_logic(
                     );
                     rounds.to_spawn -= 1;
                     rounds.spawned += 1;
-                    rounds.spawn_cd = spawn_delay(rounds.round) * bal.spawn_delay * rng.random_range(0.8..1.2);
+                    rounds.spawn_cd =
+                        spawn_delay(rounds.round) * bal.spawn_delay * rng.random_range(0.8..1.2);
                 } else {
                     rounds.spawn_cd = 0.5;
                 }

@@ -59,7 +59,14 @@ fn open_doors(
                 }
             }
             let pos = Vec3::from_array(d.prompt);
-            sfx.write(SfxEvent::at(if d.kind == "debris" { Sfx::Debris } else { Sfx::Door }, pos));
+            sfx.write(SfxEvent::at(
+                if d.kind == "debris" {
+                    Sfx::Debris
+                } else {
+                    Sfx::Door
+                },
+                pos,
+            ));
         }
         for (e, p) in parts.iter() {
             if p.door == id {
@@ -73,14 +80,27 @@ fn animate_doors(
     time: Res<Time>,
     mut commands: Commands,
     map: Res<MapFile>,
-    mut q: Query<(Entity, &DoorPart, &mut DoorAnim, &mut Transform, &mut Visibility)>,
+    mut q: Query<(
+        Entity,
+        &DoorPart,
+        &mut DoorAnim,
+        &mut Transform,
+        &mut Visibility,
+    )>,
 ) {
     for (e, part, mut anim, mut tf, mut vis) in q.iter_mut() {
         anim.t += time.delta_secs();
-        let debris = map.doors.iter().any(|d| d.id == part.door && d.kind == "debris");
+        let debris = map
+            .doors
+            .iter()
+            .any(|d| d.id == part.door && d.kind == "debris");
         let dur = if debris { 1.4 } else { 1.0 };
         let u = (anim.t / dur).min(1.0);
-        let k = if debris { u * u } else { 1.0 - (1.0 - u) * (1.0 - u) };
+        let k = if debris {
+            u * u
+        } else {
+            1.0 - (1.0 - u) * (1.0 - u)
+        };
         tf.translation = part.closed.translation.lerp(part.open.translation, k);
         tf.rotation = part.closed.rotation.slerp(part.open.rotation, k);
         if debris {

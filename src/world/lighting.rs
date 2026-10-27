@@ -14,7 +14,14 @@ impl Plugin for LightingPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (flicker_lights, power_lights, light_cones, apply_light_settings).chain().run_if(resource_exists::<MapFile>),
+            (
+                flicker_lights,
+                power_lights,
+                light_cones,
+                apply_light_settings,
+            )
+                .chain()
+                .run_if(resource_exists::<MapFile>),
         );
     }
 }
@@ -52,7 +59,14 @@ fn cone_mesh(r_top: f32, r_bot: f32, h: f32) -> Mesh {
     for i in 0..=seg {
         let a = i as f32 / seg as f32 * std::f32::consts::TAU;
         let (c, s) = (a.cos(), a.sin());
-        for (k, (r, y, b)) in [(r_top, 0.0, 1.0f32), (r_bot * 0.55, -h * 0.45, 0.55), (r_bot, -h, 0.0)].into_iter().enumerate() {
+        for (k, (r, y, b)) in [
+            (r_top, 0.0, 1.0f32),
+            (r_bot * 0.55, -h * 0.45, 0.55),
+            (r_bot, -h, 0.0),
+        ]
+        .into_iter()
+        .enumerate()
+        {
             pos.push([c * r, y, s * r]);
             nrm.push([c, 0.3, s]);
             col.push([b, b, b, 1.0]);
@@ -66,11 +80,14 @@ fn cone_mesh(r_top: f32, r_bot: f32, h: f32) -> Mesh {
             idx.extend_from_slice(&[a, b, a + 1, b, b + 1, a + 1]);
         }
     }
-    Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
-        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, pos)
-        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, nrm)
-        .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, col)
-        .with_inserted_indices(Indices::U32(idx))
+    Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, pos)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, nrm)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, col)
+    .with_inserted_indices(Indices::U32(idx))
 }
 
 pub fn spawn_map_lights(
@@ -89,28 +106,30 @@ pub fn spawn_map_lights(
         }
         let base = l.intensity * LIGHT_SCALE;
         let col = Vec3::from_array(l.color);
-        let light = commands.spawn((
-            Name::new(format!("Licht {i}")),
-            PointLight {
-                color: Color::linear_rgb(l.color[0], l.color[1], l.color[2]),
-                intensity: if l.needs_power { 0.0 } else { base },
-                range: l.range,
-                radius: 0.1,
-                shadow_maps_enabled: l.shadows && shadows,
-                // Gebackene Lichter beleuchten statische Flächen nur noch spekular,
-                // Zombies, Waffen und Türen aber weiterhin voll.
-                affects_lightmapped_mesh_diffuse: !l.baked,
-                ..default()
-            },
-            Transform::from_translation(Vec3::from_array(l.pos)),
-            MapLight {
-                wants_shadow: l.shadows,
-                base,
-                flicker: l.flicker,
-                needs_power: l.needs_power,
-                seed: i as f32 * 7.31,
-            },
-        )).id();
+        let light = commands
+            .spawn((
+                Name::new(format!("Licht {i}")),
+                PointLight {
+                    color: Color::linear_rgb(l.color[0], l.color[1], l.color[2]),
+                    intensity: if l.needs_power { 0.0 } else { base },
+                    range: l.range,
+                    radius: 0.1,
+                    shadow_maps_enabled: l.shadows && shadows,
+                    // Gebackene Lichter beleuchten statische Flächen nur noch spekular,
+                    // Zombies, Waffen und Türen aber weiterhin voll.
+                    affects_lightmapped_mesh_diffuse: !l.baked,
+                    ..default()
+                },
+                Transform::from_translation(Vec3::from_array(l.pos)),
+                MapLight {
+                    wants_shadow: l.shadows,
+                    base,
+                    flicker: l.flicker,
+                    needs_power: l.needs_power,
+                    seed: i as f32 * 7.31,
+                },
+            ))
+            .id();
         // Lichtkegel nur für Decken- und Mastleuchten (hoch, kräftig)
         let street = l.pos[1] > 5.0;
         if l.pos[1] > 2.2 && l.range >= 6.0 && l.intensity >= 15000.0 {
@@ -124,8 +143,17 @@ pub fn spawn_map_lights(
             });
             commands.spawn((
                 Name::new("Lichtkegel"),
-                LightCone { light, base, color: col, strength: if street { 0.018 } else { 0.006 } },
-                Mesh3d(if street { cone_street.clone() } else { cone_indoor.clone() }),
+                LightCone {
+                    light,
+                    base,
+                    color: col,
+                    strength: if street { 0.018 } else { 0.006 },
+                },
+                Mesh3d(if street {
+                    cone_street.clone()
+                } else {
+                    cone_indoor.clone()
+                }),
                 MeshMaterial3d(mat),
                 Transform::from_translation(Vec3::from_array(l.pos) + Vec3::Y * 0.2),
                 NotShadowCaster,
@@ -141,7 +169,10 @@ fn light_cones(
     mut mats: ResMut<Assets<StandardMaterial>>,
 ) {
     for (c, m) in cones.iter() {
-        let k = lights.get(c.light).map(|l| l.intensity / c.base.max(1.0)).unwrap_or(0.0);
+        let k = lights
+            .get(c.light)
+            .map(|l| l.intensity / c.base.max(1.0))
+            .unwrap_or(0.0);
         if let Some(mut mat) = mats.get_mut(&m.0) {
             let v = c.color * c.strength * k;
             mat.base_color = Color::linear_rgb(v.x, v.y, v.z);
@@ -149,7 +180,11 @@ fn light_cones(
     }
 }
 
-fn flicker_lights(time: Res<Time>, power: Res<Power>, mut lights: Query<(&mut PointLight, &MapLight)>) {
+fn flicker_lights(
+    time: Res<Time>,
+    power: Res<Power>,
+    mut lights: Query<(&mut PointLight, &MapLight)>,
+) {
     let t = time.elapsed_secs();
     for (mut pl, ml) in lights.iter_mut() {
         if ml.needs_power && !power.on {
@@ -160,14 +195,21 @@ fn flicker_lights(time: Res<Time>, power: Res<Power>, mut lights: Query<(&mut Po
             continue;
         }
         // Mischung aus Rauschen und gelegentlichen Aussetzern
-        let n = (t * 13.0 + ml.seed).sin() * 0.5 + (t * 31.7 + ml.seed * 2.0).sin() * 0.3 + (t * 5.3).sin() * 0.2;
+        let n = (t * 13.0 + ml.seed).sin() * 0.5
+            + (t * 31.7 + ml.seed * 2.0).sin() * 0.3
+            + (t * 5.3).sin() * 0.2;
         let cut = ((t * 2.3 + ml.seed).sin() > 0.93) as i32 as f32;
-        let f = (1.0 - ml.flicker * 0.35 * (n * 0.5 + 0.5) - cut * ml.flicker * 0.8).clamp(0.05, 1.0);
+        let f =
+            (1.0 - ml.flicker * 0.35 * (n * 0.5 + 0.5) - cut * ml.flicker * 0.8).clamp(0.05, 1.0);
         pl.intensity = ml.base * f;
     }
 }
 
-fn power_lights(time: Res<Time>, power: Res<Power>, mut lights: Query<(&mut PointLight, &MapLight)>) {
+fn power_lights(
+    time: Res<Time>,
+    power: Res<Power>,
+    mut lights: Query<(&mut PointLight, &MapLight)>,
+) {
     if !power.on {
         return;
     }
@@ -200,7 +242,11 @@ fn apply_light_settings(
     if !settings.is_changed() && added.is_empty() {
         return;
     }
-    let vis = if settings.light_cones { Visibility::Inherited } else { Visibility::Hidden };
+    let vis = if settings.light_cones {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    };
     for mut v in cones.iter_mut() {
         *v = vis;
     }

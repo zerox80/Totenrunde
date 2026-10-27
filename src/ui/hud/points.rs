@@ -47,7 +47,10 @@ pub fn popups(
             (format!("{amount}"), Color::srgb(1.0, 0.25, 0.2))
         };
         commands.spawn((
-            Popup { t: 0.0, dx: rng_off },
+            Popup {
+                t: 0.0,
+                dx: rng_off,
+            },
             label(txt, &assets.font_black, 24.0, col),
             Node {
                 position_type: PositionType::Absolute,

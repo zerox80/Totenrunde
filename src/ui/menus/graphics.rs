@@ -7,9 +7,9 @@ use bevy::prelude::*;
 use bevy::ui::Pressed;
 use bevy::ui_widgets::{Activate, Button};
 
-use super::widgets::{text, BLOOD, HOVER, IDLE, PRESS};
+use super::widgets::{BLOOD, HOVER, IDLE, PRESS, text};
 use crate::base::assets::GameAssets;
-use crate::base::settings::{GraphicsMenuOpen, Settings, QUALITY_NAMES};
+use crate::base::settings::{GraphicsMenuOpen, QUALITY_NAMES, Settings};
 
 pub struct GraphicsPlugin;
 
@@ -27,6 +27,8 @@ struct GfxRoot;
 enum Opt {
     Preset,
     Textures,
+    #[cfg(target_arch = "wasm32")]
+    RenderScale,
     Msaa,
     Shadows,
     Bloom,
@@ -75,6 +77,8 @@ fn label(o: Opt) -> &'static str {
     match o {
         Opt::Preset => "GRAFIKSTUFE",
         Opt::Textures => "TEXTUREN",
+        #[cfg(target_arch = "wasm32")]
+        Opt::RenderScale => "RENDERAUFLÖSUNG",
         Opt::Msaa => "KANTENGLÄTTUNG",
         Opt::Shadows => "ECHTZEIT-SCHATTEN",
         Opt::Bloom => "LEUCHTEFFEKT (BLOOM)",
@@ -100,6 +104,8 @@ fn value(o: Opt, s: &Settings) -> String {
             513..=1024 => "MITTEL (1024)".into(),
             _ => "HOCH (2048) *".into(),
         },
+        #[cfg(target_arch = "wasm32")]
+        Opt::RenderScale => format!("{:.0} %", s.render_scale * 100.0),
         Opt::Msaa => match s.msaa {
             0 => "AUS".into(),
             1 => "FXAA".into(),
@@ -109,7 +115,13 @@ fn value(o: Opt, s: &Settings) -> String {
         Opt::Shadows => onoff(s.shadows),
         Opt::Bloom => onoff(s.bloom),
         Opt::Film => onoff(s.film),
-        Opt::AutoExposure => onoff(s.auto_exposure),
+        Opt::AutoExposure => {
+            if cfg!(target_arch = "wasm32") {
+                "NICHT IN WEBGL2".into()
+            } else {
+                onoff(s.auto_exposure)
+            }
+        }
         Opt::Cones => onoff(s.light_cones),
         Opt::Fov => format!("{:.0}°", s.fov_deg),
         Opt::Vsync => onoff(s.vsync),
@@ -118,9 +130,11 @@ fn value(o: Opt, s: &Settings) -> String {
     }
 }
 
-const ROWS: [Opt; 12] = [
+const ROWS: [Opt; 12 + cfg!(target_arch = "wasm32") as usize] = [
     Opt::Preset,
     Opt::Textures,
+    #[cfg(target_arch = "wasm32")]
+    Opt::RenderScale,
     Opt::Msaa,
     Opt::Shadows,
     Opt::Bloom,
@@ -207,7 +221,12 @@ fn sync(
     }
 }
 
-fn on_click(ev: On<Activate>, opts: Query<&Opt>, mut settings: ResMut<Settings>, mut open: ResMut<GraphicsMenuOpen>) {
+fn on_click(
+    ev: On<Activate>,
+    opts: Query<&Opt>,
+    mut settings: ResMut<Settings>,
+    mut open: ResMut<GraphicsMenuOpen>,
+) {
     let Ok(o) = opts.get(ev.entity) else { return };
     let s = &mut *settings;
     let mut custom = true;
@@ -224,6 +243,14 @@ fn on_click(ev: On<Activate>, opts: Query<&Opt>, mut settings: ResMut<Settings>,
                 _ => 512,
             }
         }
+        #[cfg(target_arch = "wasm32")]
+        Opt::RenderScale => {
+            s.render_scale = match s.render_scale {
+                x if x < 0.6 => 0.75,
+                x if x < 0.9 => 1.0,
+                _ => 0.5,
+            };
+        }
         Opt::Msaa => {
             s.msaa = match s.msaa {
                 0 => 1,
@@ -235,10 +262,20 @@ fn on_click(ev: On<Activate>, opts: Query<&Opt>, mut settings: ResMut<Settings>,
         Opt::Shadows => s.shadows = !s.shadows,
         Opt::Bloom => s.bloom = !s.bloom,
         Opt::Film => s.film = !s.film,
-        Opt::AutoExposure => s.auto_exposure = !s.auto_exposure,
+        Opt::AutoExposure => {
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                s.auto_exposure = !s.auto_exposure;
+            }
+            custom = false;
+        }
         Opt::Cones => s.light_cones = !s.light_cones,
         Opt::Fov => {
-            s.fov_deg = if s.fov_deg >= 80.0 { 55.0 } else { s.fov_deg + 5.0 };
+            s.fov_deg = if s.fov_deg >= 80.0 {
+                55.0
+            } else {
+                s.fov_deg + 5.0
+            };
             custom = false;
         }
         Opt::Vsync => {
@@ -273,7 +310,12 @@ fn values(settings: Res<Settings>, mut q: Query<(&OptValue, &mut Text)>) {
 }
 
 #[allow(clippy::type_complexity)]
-fn visuals(mut q: Query<(&Hovered, Has<Pressed>, &mut BackgroundColor), Or<(With<Opt>, With<OpenGraphics>)>>) {
+fn visuals(
+    mut q: Query<
+        (&Hovered, Has<Pressed>, &mut BackgroundColor),
+        Or<(With<Opt>, With<OpenGraphics>)>,
+    >,
+) {
     for (hovered, pressed, mut bg) in q.iter_mut() {
         let c = if pressed {
             PRESS

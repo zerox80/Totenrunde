@@ -6,7 +6,7 @@ use bevy::text::FontSize;
 use bevy::ui::Pressed;
 use bevy::ui_widgets::{Activate, Button};
 
-use crate::base::{set_paused, AppState, InGame};
+use crate::base::{AppState, InGame, set_paused};
 
 /// Was ein Menüknopf auslöst.
 #[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
@@ -35,7 +35,12 @@ pub fn text(s: impl Into<String>, font: &Handle<Font>, size: f32, color: Color) 
 }
 
 /// Knopf mit Beschriftung; Aktion wird beim Loslassen ausgeführt.
-pub fn button(parent: &mut ChildSpawnerCommands, label: &str, action: MenuAction, font: &Handle<Font>) {
+pub fn button(
+    parent: &mut ChildSpawnerCommands,
+    label: &str,
+    action: MenuAction,
+    font: &Handle<Font>,
+) {
     parent
         .spawn((
             Button,
@@ -59,7 +64,9 @@ pub fn button(parent: &mut ChildSpawnerCommands, label: &str, action: MenuAction
         .observe(on_activate);
 }
 
-pub fn button_visuals(mut q: Query<(&Hovered, Has<Pressed>, &mut BackgroundColor), With<MenuAction>>) {
+pub fn button_visuals(
+    mut q: Query<(&Hovered, Has<Pressed>, &mut BackgroundColor), With<MenuAction>>,
+) {
     for (hovered, pressed, mut bg) in q.iter_mut() {
         let c = if pressed {
             PRESS
@@ -83,7 +90,13 @@ fn on_activate(
     mut vtime: ResMut<Time<Virtual>>,
 ) {
     if let Ok(action) = actions.get(ev.entity) {
-        apply(*action, &mut next, &mut exit, game.as_deref_mut(), &mut vtime);
+        apply(
+            *action,
+            &mut next,
+            &mut exit,
+            game.as_deref_mut(),
+            &mut vtime,
+        );
     }
 }
 

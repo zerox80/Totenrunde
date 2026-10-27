@@ -1,11 +1,38 @@
+# Rust und generierte Web-Dateien
 target/
+backend/web/pkg/
+dist/
+*.rs.bk
+
+# Lokale Konfiguration und Geheimnisse
+.env
+.env.local
+.env.*.local
+!.env.example
+settings.json
+
+# Lokale Werkzeuge, Downloads und nicht versionierte Fremd-Assets
+tools/cache/
 tools/ocio/
 tools/preview/
-tools/cache/
-__pycache__/
-*.pyc
-*.blend1
-# ungenutzte Fremd-Assets (Blender Human Base Meshes), nicht Teil des Spiels
 third_party/
-settings.json
-dist/
+
+# Python und Blender
+__pycache__/
+*.py[cod]
+*.blend[0-9]
+
+# Test-, Coverage- und Laufzeitausgaben
+coverage/
+*.profraw
+*.log
+
+# Editoren und Betriebssysteme
+.idea/
+.vscode/
+.fleet/
+*~
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -11,13 +11,14 @@ pub struct ZonesPlugin;
 
 impl Plugin for ZonesPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::Playing), init_zones).add_systems(
-            Update,
-            track_player_zone
-                .in_set(GameSet::World)
-                .run_if(in_state(AppState::Playing))
-                .run_if(resource_exists::<InGame>),
-        );
+        app.add_systems(OnEnter(AppState::Playing), init_zones)
+            .add_systems(
+                Update,
+                track_player_zone
+                    .in_set(GameSet::World)
+                    .run_if(in_state(AppState::Playing))
+                    .run_if(resource_exists::<InGame>),
+            );
     }
 }
 
@@ -76,7 +77,11 @@ fn init_zones(mut commands: Commands, map: Res<MapFile>) {
     });
 }
 
-fn track_player_zone(map: Res<MapFile>, mut zones: ResMut<Zones>, player: Single<&Transform, With<Player>>) {
+fn track_player_zone(
+    map: Res<MapFile>,
+    mut zones: ResMut<Zones>,
+    player: Single<&Transform, With<Player>>,
+) {
     if let Some(z) = map.zone_at(player.translation) {
         if zones.player_zone != z {
             zones.player_zone = z;

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090b10">
+  <meta name="description" content="Totenrunde direkt im Browser spielen">
+  <title>Totenrunde</title>
+  <link rel="icon" type="image/png" href="/assets/ui/icon.png">
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #090b10; color: #f4f4f5; }
+    #game-canvas { display: block; width: 100% !important; height: 100% !important; outline: none; touch-action: none; }
+    .overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 1.5rem; background: #090b10; text-align: center; }
+    .panel { max-width: 38rem; }
+    h1 { margin-bottom: .5rem; letter-spacing: .08em; }
+    p { line-height: 1.6; color: #d4d4d8; }
+    [hidden] { display: none !important; }
+    .error { color: #fca5a5; }
+    .hint { font-size: .9rem; color: #a1a1aa; }
+  </style>
+</head>
+<body>
+  <canvas id="game-canvas" tabindex="0" aria-label="Totenrunde-Spielansicht"></canvas>
+  <div id="loading" class="overlay" role="status" aria-live="polite">
+    <div class="panel">
+      <h1>TOTENRUNDE</h1>
+      <p>Das Spiel wird geladen …</p>
+      <p class="hint">Bitte verwende einen aktuellen Browser mit WebAssembly- und WebGL-2-Unterstützung.</p>
+    </div>
+  </div>
+  <div id="error" class="overlay" role="alert" hidden>
+    <div class="panel">
+      <h1>Start nicht möglich</h1>
+      <p id="error-message" class="error"></p>
+      <p class="hint">Prüfe deine Internetverbindung und lade die Seite neu. Totenrunde benötigt einen aktuellen Browser mit WebAssembly und WebGL 2. Ältere oder stark eingeschränkte Browser werden nicht unterstützt.</p>
+    </div>
+  </div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

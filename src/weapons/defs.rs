@@ -89,18 +89,10 @@ impl WeaponDef {
         self.wall_cost / 2
     }
     pub fn display_name(&self, upgraded: bool) -> &'static str {
-        if upgraded {
-            self.pap_name
-        } else {
-            self.name
-        }
+        if upgraded { self.pap_name } else { self.name }
     }
     pub fn mag_size(&self, upgraded: bool) -> u32 {
-        if upgraded {
-            self.pap.mag
-        } else {
-            self.mag
-        }
+        if upgraded { self.pap.mag } else { self.mag }
     }
     pub fn reserve_size(&self, upgraded: bool) -> u32 {
         if upgraded {

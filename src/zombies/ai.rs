@@ -6,7 +6,7 @@ use std::f32::consts::PI;
 use bevy::prelude::*;
 use rand::Rng;
 
-use super::{SpeedClass, ZState, Zombie, ATTACK_RANGE, ZOMBIE_RADIUS};
+use super::{ATTACK_RANGE, SpeedClass, ZOMBIE_RADIUS, ZState, Zombie};
 use crate::game::balance::Balance;
 use crate::player::{Player, PlayerDamage};
 use crate::world::barricades::Barricades;
@@ -70,7 +70,11 @@ pub fn zombie_ai(
                     z.state = ZState::Rising { t };
                 }
                 let to = ppos - pos;
-                z.yaw = turn_towards(z.yaw, yaw_of(Vec3::new(to.x, 0.0, to.z).normalize_or_zero()), dt * 1.5);
+                z.yaw = turn_towards(
+                    z.yaw,
+                    yaw_of(Vec3::new(to.x, 0.0, to.z).normalize_or_zero()),
+                    dt * 1.5,
+                );
             }
             ZState::ToWindow { b } => {
                 let bar = &mut barricades.list[b];
@@ -78,7 +82,8 @@ pub fn zombie_ai(
                 let outside = bar.outside;
                 let away = (bar.outside - bar.inside).normalize_or_zero();
                 let target = if occupied {
-                    let side = Vec3::new(-away.z, 0.0, away.x) * ((e.index_u32() % 3) as f32 - 1.0) * 0.8;
+                    let side =
+                        Vec3::new(-away.z, 0.0, away.x) * ((e.index_u32() % 3) as f32 - 1.0) * 0.8;
                     outside + away * 1.4 + side
                 } else {
                     outside
@@ -142,7 +147,11 @@ pub fn zombie_ai(
                             tearing: 0.001,
                         };
                     } else {
-                        z.state = ZState::AtWindow { b, cd: ncd, tearing: 0.0 };
+                        z.state = ZState::AtWindow {
+                            b,
+                            cd: ncd,
+                            tearing: 0.0,
+                        };
                     }
                 }
             }
@@ -167,7 +176,11 @@ pub fn zombie_ai(
             ZState::Chasing => {
                 let to = Vec3::new(ppos.x - pos.x, 0.0, ppos.z - pos.z);
                 let dist = to.length();
-                if dist < ATTACK_RANGE && (ppos.y - pos.y).abs() < 1.3 && z.attack_cd <= 0.0 && !player_downed {
+                if dist < ATTACK_RANGE
+                    && (ppos.y - pos.y).abs() < 1.3
+                    && z.attack_cd <= 0.0
+                    && !player_downed
+                {
                     z.state = ZState::Attacking {
                         t: 0.0,
                         hit: false,
@@ -196,7 +209,11 @@ pub fn zombie_ai(
                     let k = (dt * 6.0).min(1.0);
                     z.vel = z.vel + (want - z.vel) * k;
                     pos += z.vel * dt;
-                    let face = if dist < 2.0 { to.normalize_or_zero() } else { dir };
+                    let face = if dist < 2.0 {
+                        to.normalize_or_zero()
+                    } else {
+                        dir
+                    };
                     let turn = match z.class {
                         SpeedClass::Walk => 3.0,
                         SpeedClass::Run => 5.0,
@@ -269,9 +286,14 @@ pub fn zombie_ai(
         }
 
         // Kollision mit der Welt (nicht beim Klettern/Aufsteigen/Sterben)
-        if matches!(z.state, ZState::Chasing | ZState::Attacking { .. } | ZState::ToWindow { .. }) {
+        if matches!(
+            z.state,
+            ZState::Chasing | ZState::Attacking { .. } | ZState::ToWindow { .. }
+        ) {
             col.resolve_cylinder(&mut pos, ZOMBIE_RADIUS, 1.7, 0.35, F_ZOMBIE);
-            pos.y = col.ground_height(pos, ZOMBIE_RADIUS, 0.35, F_ZOMBIE).max(0.0);
+            pos.y = col
+                .ground_height(pos, ZOMBIE_RADIUS, 0.35, F_ZOMBIE)
+                .max(0.0);
         }
         tf.translation = pos;
         let lean = if z.flinch > 0.0 { z.flinch * 0.25 } else { 0.0 };

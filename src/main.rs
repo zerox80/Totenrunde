@@ -31,37 +31,48 @@ use bevy::prelude::*;
 use bevy::window::{PresentMode, WindowResolution};
 
 fn main() {
+    #[cfg(target_arch = "wasm32")]
+    console_error_panic_hook::set_once();
     base::platform::install_crash_handler();
     if !base::platform::check_assets() {
         return;
     }
-    App::new()
-        .add_plugins(
-            DefaultPlugins
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: "Totenrunde".into(),
-                        // Wayland-App-ID bzw. X11-WM_CLASS (passend zum Desktop-Eintrag)
-                        name: Some("totenrunde".into()),
-                        resolution: WindowResolution::new(1600, 900),
-                        present_mode: PresentMode::AutoVsync,
-                        ..default()
-                    }),
-                    ..default()
-                })
-                .set(ImagePlugin::default_linear()),
-        )
-        .add_plugins(bevy::post_process::auto_exposure::AutoExposurePlugin)
-        .add_plugins((
-            base::BasePlugin,
-            audio::GameAudioPlugin,
-            world::WorldPlugin,
-            player::PlayerPlugin,
-            weapons::WeaponsPlugin,
-            zombies::ZombiePlugin,
-            game::GamePlugin,
-            fx::FxPlugin,
-            ui::UiPlugin,
-        ))
-        .run();
+    let window = Window {
+        title: "Totenrunde".into(),
+        // Wayland-App-ID bzw. X11-WM_CLASS (passend zum Desktop-Eintrag)
+        name: Some("totenrunde".into()),
+        resolution: WindowResolution::new(1600, 900),
+        present_mode: PresentMode::AutoVsync,
+        ..default()
+    };
+    #[cfg(target_arch = "wasm32")]
+    let window = Window {
+        canvas: Some("#game-canvas".into()),
+        fit_canvas_to_parent: true,
+        prevent_default_event_handling: true,
+        ..window
+    };
+    let mut app = App::new();
+    app.add_plugins(
+        DefaultPlugins
+            .set(WindowPlugin {
+                primary_window: Some(window),
+                ..default()
+            })
+            .set(ImagePlugin::default_linear()),
+    );
+    #[cfg(not(target_arch = "wasm32"))]
+    app.add_plugins(bevy::post_process::auto_exposure::AutoExposurePlugin);
+    app.add_plugins((
+        base::BasePlugin,
+        audio::GameAudioPlugin,
+        world::WorldPlugin,
+        player::PlayerPlugin,
+        weapons::WeaponsPlugin,
+        zombies::ZombiePlugin,
+        game::GamePlugin,
+        fx::FxPlugin,
+        ui::UiPlugin,
+    ))
+    .run();
 }

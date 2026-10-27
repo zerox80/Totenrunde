@@ -9,8 +9,10 @@ pub struct AssetsPlugin;
 
 impl Plugin for AssetsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, load_assets)
-            .add_systems(Update, check_loaded.run_if(not(resource_exists::<AssetsReady>)));
+        app.add_systems(Startup, load_assets).add_systems(
+            Update,
+            check_loaded.run_if(not(resource_exists::<AssetsReady>)),
+        );
     }
 }
 
@@ -55,10 +57,9 @@ pub struct ZombieAnims {
 }
 
 fn load_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let root = crate::world::mapdata::asset_root();
     let zombies = ZOMBIE_MODELS
         .iter()
-        .filter(|p| root.join(p).exists())
+        .filter(|p| crate::world::mapdata::asset_exists(p))
         .map(|p| asset_server.load(*p))
         .collect();
     commands.insert_resource(GameAssets {
@@ -78,11 +79,25 @@ fn check_loaded(
     mut graphs: ResMut<Assets<AnimationGraph>>,
     state: Res<State<AppState>>,
 ) {
-    if assets.zombies.iter().any(|z| !asset_server.is_loaded_with_dependencies(z)) {
+    if assets
+        .zombies
+        .iter()
+        .any(|z| !asset_server.is_loaded_with_dependencies(z))
+    {
         return;
     }
     let names = [
-        "Idle", "Walk", "Run", "Sprint", "Attack", "Tear", "Climb", "Rise", "DeathFwd", "DeathBack", "Crawl",
+        "Idle",
+        "Walk",
+        "Run",
+        "Sprint",
+        "Attack",
+        "Tear",
+        "Climb",
+        "Rise",
+        "DeathFwd",
+        "DeathBack",
+        "Crawl",
     ];
     let mut models = Vec::new();
     for handle in &assets.zombies {
@@ -116,7 +131,11 @@ fn check_loaded(
     if models.is_empty() {
         panic!("Keine Zombie-Modelle gefunden (assets/models/zombie_*.gltf) – bitte Assets bauen");
     }
-    info!("Assets geladen: {} Zombie-Varianten (Zustand {:?})", models.len(), state.get());
+    info!(
+        "Assets geladen: {} Zombie-Varianten (Zustand {:?})",
+        models.len(),
+        state.get()
+    );
     commands.insert_resource(ZombieAnims { models });
     commands.insert_resource(AssetsReady);
 }

@@ -13,7 +13,12 @@ pub struct Fire {
     pub seed: f32,
 }
 
-pub fn spawn_fires(mut commands: Commands, map: Res<MapFile>, fx: Res<FxAssets>, lib: Option<Res<crate::audio::SfxLib>>) {
+pub fn spawn_fires(
+    mut commands: Commands,
+    map: Res<MapFile>,
+    fx: Res<FxAssets>,
+    lib: Option<Res<crate::audio::SfxLib>>,
+) {
     for (i, f) in map.fires.iter().enumerate() {
         let pos = Vec3::from_array(f.pos);
         // Knistern als räumliche Schleife
@@ -31,8 +36,10 @@ pub fn spawn_fires(mut commands: Commands, map: Res<MapFile>, fx: Res<FxAssets>,
             commands.spawn((
                 Mesh3d(fx.quad.clone()),
                 MeshMaterial3d(fx.flame.clone()),
-                Transform::from_translation(pos + Vec3::new((k as f32 - 1.5) * 0.25 * f.scale, 0.0, 0.0))
-                    .with_scale(Vec3::new(0.7, 1.1, 1.0) * f.scale),
+                Transform::from_translation(
+                    pos + Vec3::new((k as f32 - 1.5) * 0.25 * f.scale, 0.0, 0.0),
+                )
+                .with_scale(Vec3::new(0.7, 1.1, 1.0) * f.scale),
                 NotShadowCaster,
                 Fire {
                     seed: i as f32 * 3.7 + k as f32 * 1.3,
@@ -43,7 +50,11 @@ pub fn spawn_fires(mut commands: Commands, map: Res<MapFile>, fx: Res<FxAssets>,
     }
 }
 
-pub fn animate_fires(time: Res<Time>, cam: Query<&GlobalTransform, With<PlayerCamera>>, mut q: Query<(&Fire, &mut Transform)>) {
+pub fn animate_fires(
+    time: Res<Time>,
+    cam: Query<&GlobalTransform, With<PlayerCamera>>,
+    mut q: Query<(&Fire, &mut Transform)>,
+) {
     let t = time.elapsed_secs();
     let cam_pos = cam.single().map(|c| c.translation()).unwrap_or(Vec3::ZERO);
     for (f, mut tf) in q.iter_mut() {

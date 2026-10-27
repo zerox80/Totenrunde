@@ -9,7 +9,9 @@ pub struct PowerPlugin;
 impl Plugin for PowerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Power>()
-            .add_systems(OnEnter(AppState::Playing), |mut p: ResMut<Power>| *p = Power::default());
+            .add_systems(OnEnter(AppState::Playing), |mut p: ResMut<Power>| {
+                *p = Power::default()
+            });
     }
 }
 

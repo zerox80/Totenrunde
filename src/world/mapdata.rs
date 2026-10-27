@@ -217,9 +217,32 @@ pub fn asset_root() -> PathBuf {
         .join("assets")
 }
 
+pub fn asset_exists(path: &str) -> bool {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        asset_root().join(path).exists()
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = path;
+        true
+    }
+}
+
 pub fn load_map(name: &str) -> MapFile {
-    let path = asset_root().join("maps").join(format!("{name}.json"));
-    let text = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("Karte {} konnte nicht gelesen werden: {e}", path.display()));
-    serde_json::from_str(&text).unwrap_or_else(|e| panic!("Karte {} ist fehlerhaft: {e}", path.display()))
+    #[cfg(target_arch = "wasm32")]
+    {
+        assert_eq!(name, "endstation", "Unbekannte Web-Karte: {name}");
+        return serde_json::from_str(include_str!("../../assets/maps/endstation.json"))
+            .unwrap_or_else(|e| panic!("Karte endstation ist fehlerhaft: {e}"));
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let path = asset_root().join("maps").join(format!("{name}.json"));
+        let text = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            panic!("Karte {} konnte nicht gelesen werden: {e}", path.display())
+        });
+        serde_json::from_str(&text)
+            .unwrap_or_else(|e| panic!("Karte {} ist fehlerhaft: {e}", path.display()))
+    }
 }

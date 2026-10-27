@@ -2,8 +2,8 @@
 
 use bevy::prelude::*;
 
-use crate::base::debug::DebugConfig;
 use crate::base::AppState;
+use crate::base::debug::DebugConfig;
 use crate::game::powerups::ActivePowerups;
 
 pub struct PointsPlugin;
@@ -42,7 +42,11 @@ pub struct PointsPopup {
 impl Score {
     /// Punkte gutschreiben (Doppelte Punkte werden berücksichtigt).
     pub fn add(&mut self, base: u32, powerups: &ActivePowerups, _at: Option<Vec3>) -> u32 {
-        let amount = if powerups.double_points > 0.0 { base * 2 } else { base };
+        let amount = if powerups.double_points > 0.0 {
+            base * 2
+        } else {
+            base
+        };
         self.points += amount;
         self.earned += amount as u64;
         self.pending_popups.push(amount as i64);

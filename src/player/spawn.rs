@@ -5,15 +5,20 @@ use bevy::curve::cubic_splines::LinearSpline;
 use bevy::post_process::auto_exposure::{AutoExposure, AutoExposureCompensationCurve};
 use bevy::post_process::bloom::Bloom;
 use bevy::post_process::effect_stack::{ChromaticAberration, Vignette};
-use bevy::render::view::{ColorGrading, ColorGradingGlobal, ColorGradingSection};
 use bevy::prelude::*;
+use bevy::render::view::{ColorGrading, ColorGradingGlobal, ColorGradingSection};
 
 use super::{CameraFov, Health, Player, PlayerCamera, Stance};
-use crate::base::settings::Settings;
 use crate::base::AppState;
+use crate::base::settings::Settings;
 use crate::world::mapdata::MapFile;
 
-pub fn spawn_player(mut commands: Commands, map: Res<MapFile>, settings: Res<Settings>, existing: Query<(), With<Player>>) {
+pub fn spawn_player(
+    mut commands: Commands,
+    map: Res<MapFile>,
+    settings: Res<Settings>,
+    existing: Query<(), With<Player>>,
+) {
     if !existing.is_empty() {
         return;
     }
@@ -27,7 +32,8 @@ pub fn spawn_player(mut commands: Commands, map: Res<MapFile>, settings: Res<Set
                 ..default()
             },
             Health::default(),
-            Transform::from_translation(start.pos()).with_rotation(Quat::from_rotation_y(start.yaw)),
+            Transform::from_translation(start.pos())
+                .with_rotation(Quat::from_rotation_y(start.yaw)),
             Visibility::default(),
             DespawnOnExit(AppState::Playing),
         ))
@@ -41,7 +47,10 @@ pub fn spawn_player(mut commands: Commands, map: Res<MapFile>, settings: Res<Set
                     near: 0.01,
                     ..default()
                 }),
-                CameraFov { target: fov, current: fov },
+                CameraFov {
+                    target: fov,
+                    current: fov,
+                },
                 Tonemapping::TonyMcMapface,
                 DistanceFog {
                     color: Color::linear_rgb(map.fog.color[0], map.fog.color[1], map.fog.color[2]),
@@ -118,8 +127,13 @@ fn exposure_curve() -> AutoExposureCompensationCurve {
     const MAX_EV: f32 = 1.0;
     // Bevy rechnet: Belichtung = Kurve(Helligkeit) - Helligkeit
     let target = |x: f32| (STRENGTH * (REFERENCE - x)).clamp(-MAX_EV, MAX_EV);
-    let points = [AE_RANGE.0, REFERENCE - MAX_EV / STRENGTH, REFERENCE + MAX_EV / STRENGTH, AE_RANGE.1]
-        .map(|x| Vec2::new(x, target(x) + x));
+    let points = [
+        AE_RANGE.0,
+        REFERENCE - MAX_EV / STRENGTH,
+        REFERENCE + MAX_EV / STRENGTH,
+        AE_RANGE.1,
+    ]
+    .map(|x| Vec2::new(x, target(x) + x));
     AutoExposureCompensationCurve::from_curve(LinearSpline::new(points)).unwrap_or_else(|e| {
         warn!("Belichtungskurve ungültig ({e}), Augen-Anpassung ohne Kurve");
         default()
@@ -133,13 +147,19 @@ pub fn apply_graphics(
     settings: Res<Settings>,
     cams: Query<(Entity, Ref<PlayerCamera>)>,
     mut windows: Query<&mut Window>,
-    mut curves: ResMut<Assets<AutoExposureCompensationCurve>>,
-    mut curve: Local<Option<Handle<AutoExposureCompensationCurve>>>,
+    #[cfg(not(target_arch = "wasm32"))] mut curves: ResMut<Assets<AutoExposureCompensationCurve>>,
+    #[cfg(not(target_arch = "wasm32"))] mut curve: Local<
+        Option<Handle<AutoExposureCompensationCurve>>,
+    >,
 ) {
     let changed = settings.is_changed();
     if changed {
         for mut w in windows.iter_mut() {
-            let want = if settings.vsync { bevy::window::PresentMode::AutoVsync } else { bevy::window::PresentMode::AutoNoVsync };
+            let want = if settings.vsync {
+                bevy::window::PresentMode::AutoVsync
+            } else {
+                bevy::window::PresentMode::AutoNoVsync
+            };
             if w.present_mode != want {
                 w.present_mode = want;
             }
@@ -163,9 +183,12 @@ pub fn apply_graphics(
         } else {
             ec.remove::<Bloom>();
         }
+        #[cfg(not(target_arch = "wasm32"))]
         if s.auto_exposure {
             // Augen-Anpassung: dunkle Bereiche werden langsam heller, helle Lampen blenden kurz
-            let curve = curve.get_or_insert_with(|| curves.add(exposure_curve())).clone();
+            let curve = curve
+                .get_or_insert_with(|| curves.add(exposure_curve()))
+                .clone();
             ec.insert(AutoExposure {
                 range: AE_RANGE.0..=AE_RANGE.1,
                 filter: 0.15..=0.92,

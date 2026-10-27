@@ -13,7 +13,10 @@ pub struct PerksPlugin;
 impl Plugin for PerksPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Perks>()
-            .add_systems(OnEnter(AppState::Playing), (reset_perks, machines::spawn_machines))
+            .add_systems(
+                OnEnter(AppState::Playing),
+                (reset_perks, machines::spawn_machines),
+            )
             .add_systems(
                 Update,
                 (

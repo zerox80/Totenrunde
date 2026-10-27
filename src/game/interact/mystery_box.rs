@@ -8,13 +8,13 @@ use std::f32::consts::PI;
 use bevy::prelude::*;
 use rand::Rng;
 
-use super::{cost_text, try_buy, Focus, InteractKind, Interactable, Prompt};
+use super::{Focus, InteractKind, Interactable, Prompt, cost_text, try_buy};
 use crate::audio::{Sfx, SfxEvent};
 use crate::base::AppState;
 use crate::game::points::Score;
 use crate::game::powerups::ActivePowerups;
-use crate::weapons::{def, GiveWeapon, Loadout, WEAPONS};
-use crate::world::mapdata::{asset_root, MapFile};
+use crate::weapons::{GiveWeapon, Loadout, WEAPONS, def};
+use crate::world::mapdata::{MapFile, asset_exists};
 
 pub const BOX_COST: u32 = 950;
 pub const FIRE_SALE_COST: u32 = 10;
@@ -53,7 +53,10 @@ fn spot_transform(map: &MapFile, i: usize) -> Transform {
 
 fn interact_point(tf: &Transform) -> (Vec3, Vec3) {
     let fwd = tf.rotation * Vec3::NEG_Z;
-    (Vec3::new(tf.translation.x, 1.0, tf.translation.z) + fwd * 0.55, fwd)
+    (
+        Vec3::new(tf.translation.x, 1.0, tf.translation.z) + fwd * 0.55,
+        fwd,
+    )
 }
 
 pub fn spawn_box(
@@ -69,17 +72,24 @@ pub fn spawn_box(
     let spot = map.box_spots.iter().position(|s| s.start).unwrap_or(0);
     let tf = spot_transform(&map, spot);
     let root = commands
-        .spawn((Name::new("Mysteriöse Kiste"), tf, Visibility::default(), DespawnOnExit(AppState::Playing)))
+        .spawn((
+            Name::new("Mysteriöse Kiste"),
+            tf,
+            Visibility::default(),
+            DespawnOnExit(AppState::Playing),
+        ))
         .id();
     let wood = materials.add(StandardMaterial {
         base_color: Color::srgb(0.32, 0.2, 0.11),
         perceptual_roughness: 0.8,
         ..default()
     });
-    let have_model = asset_root().join("models/mystery_box.gltf").exists();
+    let have_model = asset_exists("models/mystery_box.gltf");
     if have_model {
         commands.entity(root).with_child((
-            WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/mystery_box.gltf"))),
+            WorldAssetRoot(
+                asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/mystery_box.gltf")),
+            ),
             Transform::IDENTITY,
         ));
     } else {
@@ -91,11 +101,18 @@ pub fn spawn_box(
     }
     // Deckel mit Scharnier an der Rückseite
     let lid = commands
-        .spawn((Transform::from_xyz(0.0, 0.5, 0.3), Visibility::default(), ChildOf(root)))
+        .spawn((
+            Transform::from_xyz(0.0, 0.5, 0.3),
+            Visibility::default(),
+            ChildOf(root),
+        ))
         .id();
-    if asset_root().join("models/mystery_box_lid.gltf").exists() {
+    if asset_exists("models/mystery_box_lid.gltf") {
         commands.entity(lid).with_child((
-            WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/mystery_box_lid.gltf"))),
+            WorldAssetRoot(
+                asset_server
+                    .load(GltfAssetLabel::Scene(0).from_asset("models/mystery_box_lid.gltf")),
+            ),
             Transform::IDENTITY,
         ));
     } else {
@@ -126,11 +143,17 @@ pub fn spawn_box(
         .id();
     // Teddy (eigenes Modell oder Ersatz aus Kugeln)
     let teddy = commands
-        .spawn((Transform::from_xyz(0.0, 0.3, 0.0), Visibility::Hidden, ChildOf(root)))
+        .spawn((
+            Transform::from_xyz(0.0, 0.3, 0.0),
+            Visibility::Hidden,
+            ChildOf(root),
+        ))
         .id();
-    if asset_root().join("models/teddy.gltf").exists() {
+    if asset_exists("models/teddy.gltf") {
         commands.entity(teddy).with_child((
-            WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/teddy.gltf"))),
+            WorldAssetRoot(
+                asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/teddy.gltf")),
+            ),
             Transform::IDENTITY,
         ));
     } else {
@@ -140,7 +163,12 @@ pub fn spawn_box(
             ..default()
         });
         let s = meshes.add(Sphere::new(1.0));
-        for (p, r) in [(Vec3::new(0.0, 0.0, 0.0), 0.16), (Vec3::new(0.0, 0.22, 0.0), 0.11), (Vec3::new(-0.08, 0.31, 0.0), 0.04), (Vec3::new(0.08, 0.31, 0.0), 0.04)] {
+        for (p, r) in [
+            (Vec3::new(0.0, 0.0, 0.0), 0.16),
+            (Vec3::new(0.0, 0.22, 0.0), 0.11),
+            (Vec3::new(-0.08, 0.31, 0.0), 0.04),
+            (Vec3::new(0.08, 0.31, 0.0), 0.04),
+        ] {
             commands.entity(teddy).with_child((
                 Mesh3d(s.clone()),
                 MeshMaterial3d(fur.clone()),
@@ -197,7 +225,12 @@ fn roll_weapon(lo: &Loadout, rng: &mut impl Rng) -> usize {
 }
 
 fn any_weapon(rng: &mut impl Rng) -> usize {
-    let c: Vec<usize> = WEAPONS.iter().enumerate().filter(|(_, w)| w.box_weight > 0.0).map(|(i, _)| i).collect();
+    let c: Vec<usize> = WEAPONS
+        .iter()
+        .enumerate()
+        .filter(|(_, w)| w.box_weight > 0.0)
+        .map(|(i, _)| i)
+        .collect();
     c[rng.random_range(0..c.len())]
 }
 
@@ -217,7 +250,11 @@ pub fn use_box(
     if focus.kind != Some(InteractKind::MysteryBox) {
         return;
     }
-    let pos = tfs.get(mbox.root).map(|t| t.translation).unwrap_or_default() + Vec3::Y * 0.6;
+    let pos = tfs
+        .get(mbox.root)
+        .map(|t| t.translation)
+        .unwrap_or_default()
+        + Vec3::Y * 0.6;
     let fire_sale = pu.fire_sale > 0.0;
     match mbox.phase {
         BoxPhase::Closed => {
@@ -235,11 +272,19 @@ pub fn use_box(
                 sfx.write(SfxEvent::at(Sfx::BoxMusic, pos));
                 if rng.random::<f32>() < teddy_chance {
                     // Teddy: erst normal rollen, dann statt einer Waffe der Teddy
-                    mbox.phase = BoxPhase::Rolling { t: 0.0, weapon: usize::MAX, next: 0.0 };
+                    mbox.phase = BoxPhase::Rolling {
+                        t: 0.0,
+                        weapon: usize::MAX,
+                        next: 0.0,
+                    };
                     score.points += cost; // wie im Original: Punkte zurück
                     score.pending_popups.push(cost as i64);
                 } else {
-                    mbox.phase = BoxPhase::Rolling { t: 0.0, weapon: roll_weapon(&lo, &mut rng), next: 0.0 };
+                    mbox.phase = BoxPhase::Rolling {
+                        t: 0.0,
+                        weapon: roll_weapon(&lo, &mut rng),
+                        next: 0.0,
+                    };
                 }
                 focus.pressed = false;
             }
@@ -247,7 +292,10 @@ pub fn use_box(
         BoxPhase::Offer { weapon, .. } => {
             prompt.set(format!("Halte F für {}", def(weapon).name));
             if focus.pressed {
-                give.write(GiveWeapon { weapon, upgraded: false });
+                give.write(GiveWeapon {
+                    weapon,
+                    upgraded: false,
+                });
                 mbox.phase = BoxPhase::Closed;
                 sfx.write(SfxEvent::at(Sfx::BoxClose, pos));
                 focus.pressed = false;
@@ -415,8 +463,11 @@ pub fn animate_box(
                     .spawn((
                         BoxDisplay,
                         super::WorldWeapon,
-                        WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(def(w).model()))),
-                        Transform::from_xyz(0.0, h, 0.0).with_rotation(Quat::from_rotation_y(PI / 2.0)),
+                        WorldAssetRoot(
+                            asset_server.load(GltfAssetLabel::Scene(0).from_asset(def(w).model())),
+                        ),
+                        Transform::from_xyz(0.0, h, 0.0)
+                            .with_rotation(Quat::from_rotation_y(PI / 2.0)),
                         ChildOf(mbox.root),
                     ))
                     .observe(super::hide_weapon_hands)

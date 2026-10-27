@@ -47,7 +47,11 @@ pub fn spawn_particle(
 
 pub fn rand_dir(rng: &mut impl Rng) -> Vec3 {
     loop {
-        let v = Vec3::new(rng.random_range(-1.0..1.0), rng.random_range(-1.0..1.0), rng.random_range(-1.0..1.0));
+        let v = Vec3::new(
+            rng.random_range(-1.0..1.0),
+            rng.random_range(-1.0..1.0),
+            rng.random_range(-1.0..1.0),
+        );
         let l = v.length_squared();
         if l > 0.01 && l <= 1.0 {
             return v / l.sqrt();
@@ -82,12 +86,17 @@ pub fn update_particles(
         tf.scale = Vec3::splat(s.max(0.001));
         if p.billboard {
             let to_cam = (cam_pos - tf.translation).normalize_or(Vec3::Z);
-            tf.rotation = Quat::from_rotation_arc(Vec3::Z, to_cam) * Quat::from_rotation_z(p.spin * p.life);
+            tf.rotation =
+                Quat::from_rotation_arc(Vec3::Z, to_cam) * Quat::from_rotation_z(p.spin * p.life);
         }
     }
 }
 
-pub fn update_flashes(time: Res<Time>, mut commands: Commands, mut q: Query<(Entity, &mut Flash, &mut PointLight)>) {
+pub fn update_flashes(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut q: Query<(Entity, &mut Flash, &mut PointLight)>,
+) {
     let dt = time.delta_secs();
     for (e, mut f, mut l) in q.iter_mut() {
         f.life += dt;

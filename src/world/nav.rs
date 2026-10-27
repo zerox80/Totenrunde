@@ -46,7 +46,11 @@ impl NavGrid {
         for y in 0..h {
             for x in 0..w {
                 let i = y * w + x;
-                let p = Vec3::new(min.x + (x as f32 + 0.5) * cell, 0.0, min.y + (y as f32 + 0.5) * cell);
+                let p = Vec3::new(
+                    min.x + (x as f32 + 0.5) * cell,
+                    0.0,
+                    min.y + (y as f32 + 0.5) * cell,
+                );
                 let mut blocked = false;
                 let mut door = -1i16;
                 for b in &col.boxes {
@@ -56,7 +60,11 @@ impl NavGrid {
                     if b.bottom() >= 1.7 || b.top() <= 0.4 {
                         continue;
                     }
-                    if p.x + radius < b.min.x || p.x - radius > b.max.x || p.z + radius < b.min.z || p.z - radius > b.max.z {
+                    if p.x + radius < b.min.x
+                        || p.x - radius > b.max.x
+                        || p.z + radius < b.min.z
+                        || p.z - radius > b.max.z
+                    {
                         continue;
                     }
                     let l = b.to_local(p);
@@ -130,7 +138,11 @@ impl NavGrid {
     pub fn center(&self, i: usize) -> Vec3 {
         let x = i % self.w;
         let y = i / self.w;
-        Vec3::new(self.min.x + (x as f32 + 0.5) * self.cell, 0.0, self.min.y + (y as f32 + 0.5) * self.cell)
+        Vec3::new(
+            self.min.x + (x as f32 + 0.5) * self.cell,
+            0.0,
+            self.min.y + (y as f32 + 0.5) * self.cell,
+        )
     }
 
     pub fn walkable(&self, p: Vec3) -> bool {
@@ -218,7 +230,9 @@ impl NavGrid {
     }
 
     pub fn dist_at(&self, p: Vec3) -> u32 {
-        self.index_of(p).map(|i| self.dist[i]).unwrap_or(UNREACHABLE)
+        self.index_of(p)
+            .map(|i| self.dist[i])
+            .unwrap_or(UNREACHABLE)
     }
 
     /// Bewegungsrichtung (XZ, normiert) entlang des Flow-Fields. Schaut zwei Zellen voraus,
@@ -292,7 +306,11 @@ impl NavGrid {
         let len = d.length();
         let steps = (len / (self.cell * 0.5)).ceil() as usize;
         for s in 0..=steps {
-            let t = if steps == 0 { 0.0 } else { s as f32 / steps as f32 };
+            let t = if steps == 0 {
+                0.0
+            } else {
+                s as f32 / steps as f32
+            };
             let p = a + d * t;
             if !self.walkable(p) {
                 return false;

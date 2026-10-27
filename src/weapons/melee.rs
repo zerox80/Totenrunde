@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 use super::assets::WeaponAssets;
 use super::defs::Projectile;
-use super::loadout::{Loadout, WState, KNIFE_DAMAGE};
+use super::loadout::{KNIFE_DAMAGE, Loadout, WState};
 use super::projectiles::ProjectileBody;
 use crate::audio::{Sfx, SfxEvent};
 use crate::base::{AppState, InGame};
@@ -90,7 +90,8 @@ pub fn melee_and_throw(
         if !thrown && t >= 0.28 {
             thrown = true;
             lo.grenades = lo.grenades.saturating_sub(1);
-            let vel = (forward + up * 0.25).normalize() * 15.0 + Vec3::new(pl.vel.x, 0.0, pl.vel.z) * 0.5;
+            let vel =
+                (forward + up * 0.25).normalize() * 15.0 + Vec3::new(pl.vel.x, 0.0, pl.vel.z) * 0.5;
             commands.spawn((
                 ProjectileBody {
                     kind: Projectile::Grenade,
@@ -120,5 +121,4 @@ pub fn melee_and_throw(
         };
         return;
     }
-
 }

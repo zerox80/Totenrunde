@@ -7,7 +7,7 @@ use super::{Focus, InteractKind, Interactable, Prompt};
 use crate::audio::{Sfx, SfxEvent};
 use crate::base::AppState;
 use crate::base::debug::DebugConfig;
-use crate::world::mapdata::{asset_root, MapFile};
+use crate::world::mapdata::{MapFile, asset_exists};
 use crate::world::power::Power;
 
 #[derive(Component)]
@@ -52,9 +52,11 @@ pub fn spawn_power_switch(
             DespawnOnExit(AppState::Playing),
         ))
         .id();
-    if asset_root().join("models/power_switch.gltf").exists() {
+    if asset_exists("models/power_switch.gltf") {
         commands.entity(root).with_child((
-            WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/power_switch.gltf"))),
+            WorldAssetRoot(
+                asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/power_switch.gltf")),
+            ),
             Transform::IDENTITY,
         ));
     } else {
@@ -79,7 +81,9 @@ pub fn spawn_power_switch(
     let on = power.on;
     commands.entity(root).with_children(|p| {
         p.spawn((
-            PowerLever { t: if on { 1.0 } else { 0.0 } },
+            PowerLever {
+                t: if on { 1.0 } else { 0.0 },
+            },
             Transform::from_xyz(0.18, 0.0, -0.26),
             Visibility::default(),
         ))
@@ -110,7 +114,11 @@ pub fn use_power_switch(
     }
 }
 
-pub fn animate_power_switch(time: Res<Time>, power: Res<Power>, mut q: Query<(&mut PowerLever, &mut Transform)>) {
+pub fn animate_power_switch(
+    time: Res<Time>,
+    power: Res<Power>,
+    mut q: Query<(&mut PowerLever, &mut Transform)>,
+) {
     for (mut l, mut tf) in q.iter_mut() {
         let goal = if power.on { 1.0 } else { 0.0 };
         l.t += (goal - l.t).clamp(-time.delta_secs() * 2.5, time.delta_secs() * 2.5);

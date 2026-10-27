@@ -6,7 +6,7 @@ use bevy::audio::Volume;
 use bevy::prelude::*;
 use rand::Rng;
 
-use super::sfx::{Sfx, ALL};
+use super::sfx::{ALL, Sfx};
 use crate::base::settings::Settings;
 
 #[derive(Message, Clone, Copy)]
@@ -55,11 +55,16 @@ pub struct SfxLib {
 pub fn load_sounds(mut commands: Commands, asset_server: Res<AssetServer>) {
     // Nur vorhandene Dateien laden (die Sounds werden erst noch erzeugt) – sonst
     // füllt jede fehlende Datei das Log mit Fehlern.
-    let root = crate::world::mapdata::asset_root();
-    let load = |rel: String| -> Option<Handle<AudioSource>> { root.join(&rel).exists().then(|| asset_server.load(rel)) };
+    let load = |rel: String| -> Option<Handle<AudioSource>> {
+        crate::world::mapdata::asset_exists(&rel).then(|| asset_server.load(rel))
+    };
     let mut map = HashMap::new();
     for s in ALL {
-        let handles = s.files().iter().filter_map(|f| load(format!("sounds/{f}.wav"))).collect();
+        let handles = s
+            .files()
+            .iter()
+            .filter_map(|f| load(format!("sounds/{f}.wav")))
+            .collect();
         map.insert(*s, handles);
     }
     commands.insert_resource(SfxLib {
@@ -70,20 +75,31 @@ pub fn load_sounds(mut commands: Commands, asset_server: Res<AssetServer>) {
     });
 }
 
-pub fn play_sfx(mut commands: Commands, lib: Option<Res<SfxLib>>, mut events: MessageReader<SfxEvent>) {
+pub fn play_sfx(
+    mut commands: Commands,
+    lib: Option<Res<SfxLib>>,
+    mut events: MessageReader<SfxEvent>,
+) {
     let Some(lib) = lib else {
         events.clear();
         return;
     };
     let mut rng = rand::rng();
     for ev in events.read() {
-        let Some(list) = lib.map.get(&ev.sfx) else { continue };
+        let Some(list) = lib.map.get(&ev.sfx) else {
+            continue;
+        };
         if list.is_empty() {
             continue;
         }
         let h = list[rng.random_range(0..list.len())].clone();
         let j = ev.sfx.pitch_jitter();
-        let pitch = ev.pitch * if j > 0.0 { rng.random_range(1.0 - j..1.0 + j) } else { 1.0 };
+        let pitch = ev.pitch
+            * if j > 0.0 {
+                rng.random_range(1.0 - j..1.0 + j)
+            } else {
+                1.0
+            };
         let settings = PlaybackSettings::DESPAWN
             .with_volume(Volume::Linear(ev.sfx.base_volume() * ev.volume))
             .with_speed(pitch);

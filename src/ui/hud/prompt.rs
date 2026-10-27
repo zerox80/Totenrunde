@@ -3,8 +3,8 @@
 use bevy::prelude::*;
 
 use super::widgets::label;
-use crate::base::assets::GameAssets;
 use crate::base::AppState;
+use crate::base::assets::GameAssets;
 use crate::game::interact::Prompt;
 
 #[derive(Component)]
@@ -23,7 +23,10 @@ pub fn spawn(mut commands: Commands, assets: Res<GameAssets>) {
             DespawnOnExit(AppState::Playing),
         ))
         .with_children(|p| {
-            p.spawn((PromptText, label("", &assets.font_bold, 22.0, Color::srgb(0.96, 0.95, 0.9))));
+            p.spawn((
+                PromptText,
+                label("", &assets.font_bold, 22.0, Color::srgb(0.96, 0.95, 0.9)),
+            ));
         });
 }
 

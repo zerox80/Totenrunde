@@ -3,9 +3,9 @@
 use bevy::prelude::*;
 
 use super::widgets::label;
-use crate::base::assets::GameAssets;
 use crate::base::AppState;
-use crate::weapons::{def, Loadout};
+use crate::base::assets::GameAssets;
+use crate::weapons::{Loadout, def};
 
 #[derive(Component)]
 pub struct MagText;
@@ -35,7 +35,15 @@ pub fn spawn(mut commands: Commands, assets: Res<GameAssets>, asset_server: Res<
             },
             DespawnOnExit(AppState::Playing),
         ))
-        .with_child((AmmoHint, label("", &assets.font_bold, 20.0, Color::srgba(1.0, 1.0, 1.0, 0.9))));
+        .with_child((
+            AmmoHint,
+            label(
+                "",
+                &assets.font_bold,
+                20.0,
+                Color::srgba(1.0, 1.0, 1.0, 0.9),
+            ),
+        ));
     commands
         .spawn((
             Node {
@@ -49,7 +57,15 @@ pub fn spawn(mut commands: Commands, assets: Res<GameAssets>, asset_server: Res<
             DespawnOnExit(AppState::Playing),
         ))
         .with_children(|p| {
-            p.spawn((WeaponName, label("", &assets.font_bold, 17.0, Color::srgba(0.92, 0.9, 0.84, 0.9))));
+            p.spawn((
+                WeaponName,
+                label(
+                    "",
+                    &assets.font_bold,
+                    17.0,
+                    Color::srgba(0.92, 0.9, 0.84, 0.9),
+                ),
+            ));
             // feine Linie unter dem Namen
             p.spawn((
                 Node {
@@ -70,7 +86,12 @@ pub fn spawn(mut commands: Commands, assets: Res<GameAssets>, asset_server: Res<
                 r.spawn((MagText, label("8", &assets.font_black, 52.0, Color::WHITE)));
                 r.spawn((
                     ReserveText,
-                    label("/ 80", &assets.font_bold, 24.0, Color::srgba(1.0, 1.0, 1.0, 0.75)),
+                    label(
+                        "/ 80",
+                        &assets.font_bold,
+                        24.0,
+                        Color::srgba(1.0, 1.0, 1.0, 0.75),
+                    ),
                     Node {
                         margin: UiRect::bottom(px(6)),
                         ..default()
@@ -106,15 +127,31 @@ pub fn spawn(mut commands: Commands, assets: Res<GameAssets>, asset_server: Res<
 #[allow(clippy::type_complexity)]
 pub fn update(
     lo: Single<&Loadout>,
-    mut mag: Query<(&mut Text, &mut TextColor), (With<MagText>, Without<ReserveText>, Without<WeaponName>)>,
+    mut mag: Query<
+        (&mut Text, &mut TextColor),
+        (With<MagText>, Without<ReserveText>, Without<WeaponName>),
+    >,
     mut res: Query<&mut Text, (With<ReserveText>, Without<MagText>, Without<WeaponName>)>,
     mut name: Query<&mut Text, (With<WeaponName>, Without<MagText>, Without<ReserveText>)>,
     mut nades: Query<(&Grenade, &mut Visibility)>,
-    mut hint: Query<&mut Text, (With<AmmoHint>, Without<MagText>, Without<ReserveText>, Without<WeaponName>)>,
+    mut hint: Query<
+        &mut Text,
+        (
+            With<AmmoHint>,
+            Without<MagText>,
+            Without<ReserveText>,
+            Without<WeaponName>,
+        ),
+    >,
 ) {
     let h = match lo.current_slot() {
         Some(s) if s.mag == 0 && s.reserve == 0 => "KEINE MUNITION",
-        Some(s) if s.mag as f32 <= (def(s.weapon).mag_size(s.upgraded) as f32 * 0.25).max(1.0) && s.reserve > 0 => "NACHLADEN",
+        Some(s)
+            if s.mag as f32 <= (def(s.weapon).mag_size(s.upgraded) as f32 * 0.25).max(1.0)
+                && s.reserve > 0 =>
+        {
+            "NACHLADEN"
+        }
         Some(s) if s.reserve <= def(s.weapon).mag_size(s.upgraded) && s.mag > 0 => "WENIG MUNITION",
         _ => "",
     };
@@ -127,7 +164,12 @@ pub fn update(
         Some(s) => {
             let d = def(s.weapon);
             let low = s.mag as f32 <= (d.mag_size(s.upgraded) as f32 * 0.25).max(1.0);
-            (s.mag.to_string(), format!("/ {}", s.reserve), d.display_name(s.upgraded).to_uppercase(), low)
+            (
+                s.mag.to_string(),
+                format!("/ {}", s.reserve),
+                d.display_name(s.upgraded).to_uppercase(),
+                low,
+            )
         }
         None => (String::new(), String::new(), String::new(), false),
     };
@@ -135,7 +177,11 @@ pub fn update(
         if t.0 != m {
             t.0 = m.clone();
         }
-        c.0 = if low { Color::srgb(1.0, 0.3, 0.25) } else { Color::WHITE };
+        c.0 = if low {
+            Color::srgb(1.0, 0.3, 0.25)
+        } else {
+            Color::WHITE
+        };
     }
     for mut t in res.iter_mut() {
         if t.0 != r {
@@ -148,7 +194,11 @@ pub fn update(
         }
     }
     for (g, mut v) in nades.iter_mut() {
-        let want = if g.0 < lo.grenades { Visibility::Inherited } else { Visibility::Hidden };
+        let want = if g.0 < lo.grenades {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
         if *v != want {
             *v = want;
         }

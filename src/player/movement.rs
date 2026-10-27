@@ -3,10 +3,10 @@
 
 use bevy::prelude::*;
 
-use super::{Player, Stance, GRAVITY, JUMP_VEL, RADIUS, SPRINT_MULT, STEP, WALK_SPEED};
+use super::{GRAVITY, JUMP_VEL, Player, RADIUS, SPRINT_MULT, STEP, Stance, WALK_SPEED};
 use crate::base::InGame;
 use crate::world::collision::{CollisionWorld, F_PLAYER};
-use crate::zombies::{ZState, Zombie, ZOMBIE_RADIUS};
+use crate::zombies::{ZOMBIE_RADIUS, ZState, Zombie};
 
 pub fn movement(
     keys: Res<ButtonInput<KeyCode>>,
@@ -35,7 +35,11 @@ pub fn movement(
             _ => Stance::Prone,
         };
     }
-    if active && keys.just_pressed(KeyCode::Space) && p.stance != Stance::Stand && p.speed_mult > 0.5 {
+    if active
+        && keys.just_pressed(KeyCode::Space)
+        && p.stance != Stance::Stand
+        && p.speed_mult > 0.5
+    {
         // Leertaste stellt auf
         p.stance = match p.stance {
             Stance::Prone => Stance::Crouch,
@@ -73,7 +77,11 @@ pub fn movement(
     let wish = forward * input.y + right * input.x;
 
     // --- Sprinten ---
-    let want_sprint = active && keys.pressed(KeyCode::ShiftLeft) && input.y > 0.5 && p.ads < 0.3 && p.speed_mult > 0.5;
+    let want_sprint = active
+        && keys.pressed(KeyCode::ShiftLeft)
+        && input.y > 0.5
+        && p.ads < 0.3
+        && p.speed_mult > 0.5;
     if want_sprint && p.stamina > 0.0 && p.grounded {
         if !p.sprinting {
             p.stance = Stance::Stand;
@@ -107,7 +115,11 @@ pub fn movement(
     let accel = if p.grounded { 38.0 } else { 7.0 };
     let diff = target - hv;
     let max_dv = accel * dt;
-    let hv = if diff.length() <= max_dv { target } else { hv + diff.normalize() * max_dv };
+    let hv = if diff.length() <= max_dv {
+        target
+    } else {
+        hv + diff.normalize() * max_dv
+    };
     p.vel.x = hv.x;
     p.vel.z = hv.z;
 
@@ -163,7 +175,11 @@ pub fn movement(
     // --- Kopfwippen ---
     let hspeed = Vec2::new(p.vel.x, p.vel.z).length();
     p.moving = hspeed > 0.5;
-    let bob_target = if p.grounded { (hspeed / WALK_SPEED).min(1.6) } else { 0.0 };
+    let bob_target = if p.grounded {
+        (hspeed / WALK_SPEED).min(1.6)
+    } else {
+        0.0
+    };
     p.bob += (bob_target - p.bob) * (dt * 8.0).min(1.0);
     let freq = if p.sprinting { 13.5 } else { 10.0 };
     p.bob_phase += dt * freq * (0.4 + 0.6 * (hspeed / WALK_SPEED).min(1.5));

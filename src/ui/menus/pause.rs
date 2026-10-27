@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 
-use super::widgets::{button, root, text, MenuAction};
+use super::widgets::{MenuAction, button, root, text};
 use crate::base::assets::GameAssets;
 use crate::base::{AppState, InGame};
 
@@ -17,14 +17,29 @@ impl Plugin for PausePlugin {
 #[derive(Component)]
 struct PauseRoot;
 
-fn sync(mut commands: Commands, game: Res<InGame>, roots: Query<Entity, With<PauseRoot>>, assets: Res<GameAssets>) {
+fn sync(
+    mut commands: Commands,
+    game: Res<InGame>,
+    roots: Query<Entity, With<PauseRoot>>,
+    assets: Res<GameAssets>,
+) {
     let shown = !roots.is_empty();
     if game.paused && !shown {
         commands
-            .spawn((root(Color::srgba(0.0, 0.0, 0.0, 0.72)), PauseRoot, GlobalZIndex(50), DespawnOnExit(AppState::Playing)))
+            .spawn((
+                root(Color::srgba(0.0, 0.0, 0.0, 0.72)),
+                PauseRoot,
+                GlobalZIndex(50),
+                DespawnOnExit(AppState::Playing),
+            ))
             .with_children(|p| {
                 p.spawn((
-                    text("PAUSE", &assets.font_black, 72.0, Color::srgb(0.9, 0.88, 0.84)),
+                    text(
+                        "PAUSE",
+                        &assets.font_black,
+                        72.0,
+                        Color::srgb(0.9, 0.88, 0.84),
+                    ),
                     Node {
                         margin: UiRect::bottom(px(40)),
                         ..default()

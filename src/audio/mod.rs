@@ -7,7 +7,7 @@ pub mod sfx;
 use bevy::audio::{DefaultSpatialScale, SpatialScale};
 use bevy::prelude::*;
 
-pub use music::{spawn_music, MusicTrack};
+pub use music::{MusicTrack, spawn_music};
 pub use playback::{SfxEvent, SfxLib};
 pub use sfx::Sfx;
 
@@ -18,7 +18,14 @@ impl Plugin for GameAudioPlugin {
         app.add_message::<SfxEvent>()
             .insert_resource(DefaultSpatialScale(SpatialScale::new(0.16)))
             .add_systems(Startup, playback::load_sounds)
-            .add_systems(Update, (playback::play_sfx, playback::apply_volume, music::music_fade))
+            .add_systems(
+                Update,
+                (
+                    playback::play_sfx,
+                    playback::apply_volume,
+                    music::music_fade,
+                ),
+            )
             .add_systems(OnEnter(crate::base::AppState::Playing), start_ambience);
     }
 }

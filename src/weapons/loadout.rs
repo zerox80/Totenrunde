@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 
-use super::defs::{def, weapon_index, WeaponClass};
+use super::defs::{WeaponClass, def, weapon_index};
 use crate::game::perks::{Perk, Perks};
 use crate::player::Player;
 
@@ -37,14 +37,34 @@ impl WeaponSlot {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum WState {
     Ready,
-    Reloading { t: f32, dur: f32 },
-    ShellReload { t: f32, per: f32 },
-    Lowering { t: f32, to: Option<usize> },
-    Raising { t: f32 },
-    Melee { t: f32, hit: bool },
-    Throw { t: f32, thrown: bool },
+    Reloading {
+        t: f32,
+        dur: f32,
+    },
+    ShellReload {
+        t: f32,
+        per: f32,
+    },
+    Lowering {
+        t: f32,
+        to: Option<usize>,
+    },
+    Raising {
+        t: f32,
+    },
+    Melee {
+        t: f32,
+        hit: bool,
+    },
+    Throw {
+        t: f32,
+        thrown: bool,
+    },
     /// Waffe gesenkt (Perk trinken, Kiste, ...)
-    Busy { t: f32, dur: f32 },
+    Busy {
+        t: f32,
+        dur: f32,
+    },
     Empty,
 }
 
@@ -78,11 +98,7 @@ impl Loadout {
         self.slots.iter().position(|s| s.weapon == weapon)
     }
     pub fn max_slots(perks: &Perks) -> usize {
-        if perks.has(Perk::MuleKick) {
-            3
-        } else {
-            2
-        }
+        if perks.has(Perk::MuleKick) { 3 } else { 2 }
     }
     pub fn busy(&mut self, dur: f32) {
         self.state = WState::Busy { t: 0.0, dur };
@@ -106,17 +122,23 @@ pub fn take_current(lo: &mut Loadout) -> Option<WeaponSlot> {
     }
     let s = lo.slots.remove(lo.current);
     lo.current = 0;
-    lo.state = if lo.slots.is_empty() { WState::Empty } else { WState::Raising { t: 0.0 } };
+    lo.state = if lo.slots.is_empty() {
+        WState::Empty
+    } else {
+        WState::Raising { t: 0.0 }
+    };
     Some(s)
 }
 
 /// Am Boden: auf eine Pistole wechseln (notfalls eine M1911 leihen).
 pub fn enter_last_stand(lo: &mut Loadout) {
     lo.saved_current = Some(lo.current);
-    let pistol = lo
-        .slots
-        .iter()
-        .position(|s| matches!(def(s.weapon).class, WeaponClass::Pistol | WeaponClass::Wonder));
+    let pistol = lo.slots.iter().position(|s| {
+        matches!(
+            def(s.weapon).class,
+            WeaponClass::Pistol | WeaponClass::Wonder
+        )
+    });
     match pistol {
         Some(i) => {
             lo.current = i;
@@ -140,7 +162,11 @@ pub fn leave_last_stand(lo: &mut Loadout) {
     if let Some(c) = lo.saved_current.take() {
         lo.current = c.min(lo.slots.len().saturating_sub(1));
     }
-    lo.state = if lo.slots.is_empty() { WState::Empty } else { WState::Raising { t: 0.0 } };
+    lo.state = if lo.slots.is_empty() {
+        WState::Empty
+    } else {
+        WState::Raising { t: 0.0 }
+    };
 }
 
 /// Inventar beim Spielstart: M1911 mit Messer und 2 Granaten (wie in BO2).

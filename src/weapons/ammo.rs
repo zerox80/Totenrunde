@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 
 use super::defs::def;
-use super::loadout::{GiveWeapon, Loadout, WState, WeaponSlot, MAX_GRENADES};
+use super::loadout::{GiveWeapon, Loadout, MAX_GRENADES, WState, WeaponSlot};
 use crate::audio::{Sfx, SfxEvent};
 use crate::game::perks::Perks;
 use crate::game::powerups::{PowerupCollected, PowerupKind};
@@ -21,7 +21,10 @@ pub fn give_weapons(
             s.upgraded |= ev.upgraded;
             s.refill();
             if lo.current != i {
-                lo.state = WState::Lowering { t: 0.0, to: Some(i) };
+                lo.state = WState::Lowering {
+                    t: 0.0,
+                    to: Some(i),
+                };
             }
         } else if lo.slots.len() < max {
             lo.slots.push(WeaponSlot::new(ev.weapon, ev.upgraded));
@@ -30,7 +33,10 @@ pub fn give_weapons(
                 lo.current = 0;
                 lo.state = WState::Raising { t: 0.0 };
             } else {
-                lo.state = WState::Lowering { t: 0.0, to: Some(to) };
+                lo.state = WState::Lowering {
+                    t: 0.0,
+                    to: Some(to),
+                };
             }
         } else {
             let c = lo.current.min(lo.slots.len() - 1);

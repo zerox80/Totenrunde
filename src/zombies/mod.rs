@@ -12,8 +12,8 @@ use bevy::prelude::*;
 
 use crate::base::{AppState, GameSet, InGame};
 
-pub use hitbox::{raycast_zombies, RayZombieHit};
-pub use spawn::{spawn_zombie, ZombieSpawn};
+pub use hitbox::{RayZombieHit, raycast_zombies};
+pub use spawn::{ZombieSpawn, spawn_zombie};
 
 pub struct ZombiePlugin;
 
@@ -31,7 +31,12 @@ impl Plugin for ZombiePlugin {
             .add_systems(Update, blob::attach)
             .add_systems(
                 Update,
-                (steering::update_flow, ai::zombie_ai, steering::zombie_separation, anim::animate_zombies)
+                (
+                    steering::update_flow,
+                    ai::zombie_ai,
+                    steering::zombie_separation,
+                    anim::animate_zombies,
+                )
                     .chain()
                     .in_set(ZombieSystems)
                     .in_set(GameSet::World)
@@ -73,13 +78,30 @@ impl SpeedClass {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ZState {
-    Rising { t: f32 },
-    ToWindow { b: usize },
-    AtWindow { b: usize, cd: f32, tearing: f32 },
-    Climbing { b: usize, t: f32 },
+    Rising {
+        t: f32,
+    },
+    ToWindow {
+        b: usize,
+    },
+    AtWindow {
+        b: usize,
+        cd: f32,
+        tearing: f32,
+    },
+    Climbing {
+        b: usize,
+        t: f32,
+    },
     Chasing,
-    Attacking { t: f32, hit: bool, window: Option<usize> },
-    Dying { t: f32 },
+    Attacking {
+        t: f32,
+        hit: bool,
+        window: Option<usize>,
+    },
+    Dying {
+        t: f32,
+    },
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

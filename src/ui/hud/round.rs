@@ -5,12 +5,11 @@
 use bevy::prelude::*;
 use bevy::ui::UiTransform;
 
-use super::widgets::{label, CHALK_RED};
+use super::widgets::{CHALK_RED, label};
 use crate::base::assets::GameAssets;
 use crate::base::{AppState, InGame};
 use crate::game::perks::{Perk, Perks};
 use crate::game::rounds::{RoundPhase, Rounds};
-use crate::world::mapdata::asset_root;
 
 #[derive(Component)]
 pub struct RoundNumber;
@@ -60,7 +59,10 @@ pub fn spawn(mut commands: Commands, asset_server: Res<AssetServer>, assets: Res
                 ImageNode::new(asset_server.load("ui/points_bar.png")),
             ))
             .with_children(|b| {
-                b.spawn((super::points::PointsText, label("500", &assets.font_black, 34.0, Color::WHITE)));
+                b.spawn((
+                    super::points::PointsText,
+                    label("500", &assets.font_black, 34.0, Color::WHITE),
+                ));
             });
             // Kreide: Strichliste (Runde 1–5) bzw. Ziffern
             p.spawn(Node {
@@ -122,7 +124,9 @@ pub fn update(
     let round = r.round;
     // weißes Pulsieren beim Rundenwechsel
     let pulse = match r.phase {
-        RoundPhase::Intro { .. } | RoundPhase::Intermission { .. } => (time.elapsed_secs() * 4.0).sin() * 0.5 + 0.5,
+        RoundPhase::Intro { .. } | RoundPhase::Intermission { .. } => {
+            (time.elapsed_secs() * 4.0).sin() * 0.5 + 0.5
+        }
         RoundPhase::Active => 0.0,
     };
     let since = game.time - r.changed_at;
@@ -162,7 +166,11 @@ pub fn update(
         img.color = col;
     }
     for (tally, mut v, mut img) in tallies.iter_mut() {
-        let want = if round <= 5 && tally.0 == round { Visibility::Inherited } else { Visibility::Hidden };
+        let want = if round <= 5 && tally.0 == round {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
         if *v != want {
             *v = want;
         }
@@ -201,12 +209,22 @@ pub fn perk_icons(
             BorderColor::all(Color::srgba(1.0, 1.0, 1.0, 0.5)),
             ChildOf(row),
         ));
-        if asset_root().join(&icon).exists() {
+        if crate::world::mapdata::asset_exists(&icon) {
             e.insert(ImageNode::new(asset_server.load(icon)));
         } else {
             let c = perk.color().to_srgba();
-            e.insert(BackgroundColor(Color::srgba(c.red * 0.55, c.green * 0.55, c.blue * 0.55, 0.92)));
-            let short: String = perk.name().split(['-', ' ']).filter_map(|w| w.chars().next()).take(2).collect();
+            e.insert(BackgroundColor(Color::srgba(
+                c.red * 0.55,
+                c.green * 0.55,
+                c.blue * 0.55,
+                0.92,
+            )));
+            let short: String = perk
+                .name()
+                .split(['-', ' '])
+                .filter_map(|w| w.chars().next())
+                .take(2)
+                .collect();
             e.with_child(label(short, &assets.font_black, 20.0, Color::WHITE));
         }
     }

@@ -57,17 +57,29 @@ impl Obb {
     #[inline]
     pub fn to_local(&self, p: Vec3) -> Vec3 {
         let d = p - self.c;
-        Vec3::new(d.x * self.cs - d.z * self.sn, d.y, d.x * self.sn + d.z * self.cs)
+        Vec3::new(
+            d.x * self.cs - d.z * self.sn,
+            d.y,
+            d.x * self.sn + d.z * self.cs,
+        )
     }
 
     #[inline]
     pub fn dir_to_local(&self, v: Vec3) -> Vec3 {
-        Vec3::new(v.x * self.cs - v.z * self.sn, v.y, v.x * self.sn + v.z * self.cs)
+        Vec3::new(
+            v.x * self.cs - v.z * self.sn,
+            v.y,
+            v.x * self.sn + v.z * self.cs,
+        )
     }
 
     #[inline]
     pub fn dir_to_world(&self, v: Vec3) -> Vec3 {
-        Vec3::new(v.x * self.cs + v.z * self.sn, v.y, -v.x * self.sn + v.z * self.cs)
+        Vec3::new(
+            v.x * self.cs + v.z * self.sn,
+            v.y,
+            -v.x * self.sn + v.z * self.cs,
+        )
     }
 
     #[inline]
@@ -181,7 +193,14 @@ impl CollisionWorld {
                     "door" => ColKind::Door,
                     _ => ColKind::Solid,
                 };
-                Obb::new(Vec3::from_array(c.c), Vec3::from_array(c.h), c.yaw, c.f, kind, c.door)
+                Obb::new(
+                    Vec3::from_array(c.c),
+                    Vec3::from_array(c.h),
+                    c.yaw,
+                    c.f,
+                    kind,
+                    c.door,
+                )
             })
             .collect();
         Self { boxes }
@@ -197,7 +216,14 @@ impl CollisionWorld {
 
     /// Schiebt einen senkrechten Zylinder (Fußpunkt `pos`) aus allen Boxen heraus.
     /// Hindernisse, deren Oberkante unter `pos.y + step` liegt, gelten als Stufe.
-    pub fn resolve_cylinder(&self, pos: &mut Vec3, radius: f32, height: f32, step: f32, mask: u8) -> bool {
+    pub fn resolve_cylinder(
+        &self,
+        pos: &mut Vec3,
+        radius: f32,
+        height: f32,
+        step: f32,
+        mask: u8,
+    ) -> bool {
         let mut hit = false;
         for _ in 0..3 {
             let mut moved = false;
@@ -241,7 +267,11 @@ impl CollisionWorld {
             if top > pos.y + step || top <= g {
                 continue;
             }
-            if pos.x + r < b.min.x || pos.x - r > b.max.x || pos.z + r < b.min.z || pos.z - r > b.max.z {
+            if pos.x + r < b.min.x
+                || pos.x - r > b.max.x
+                || pos.z + r < b.min.z
+                || pos.z - r > b.max.z
+            {
                 continue;
             }
             if b.overlaps_circle(pos, r) {
@@ -262,7 +292,11 @@ impl CollisionWorld {
             if bottom < pos.y + 0.3 || bottom >= c {
                 continue;
             }
-            if pos.x + radius < b.min.x || pos.x - radius > b.max.x || pos.z + radius < b.min.z || pos.z - radius > b.max.z {
+            if pos.x + radius < b.min.x
+                || pos.x - radius > b.max.x
+                || pos.z + radius < b.min.z
+                || pos.z - radius > b.max.z
+            {
                 continue;
             }
             if b.overlaps_circle(pos, radius) {
@@ -274,9 +308,21 @@ impl CollisionWorld {
 
     pub fn raycast(&self, origin: Vec3, dir: Vec3, max_t: f32, mask: u8) -> Option<RayHit> {
         let inv = Vec3::new(
-            if dir.x.abs() > 1e-9 { 1.0 / dir.x } else { f32::INFINITY },
-            if dir.y.abs() > 1e-9 { 1.0 / dir.y } else { f32::INFINITY },
-            if dir.z.abs() > 1e-9 { 1.0 / dir.z } else { f32::INFINITY },
+            if dir.x.abs() > 1e-9 {
+                1.0 / dir.x
+            } else {
+                f32::INFINITY
+            },
+            if dir.y.abs() > 1e-9 {
+                1.0 / dir.y
+            } else {
+                f32::INFINITY
+            },
+            if dir.z.abs() > 1e-9 {
+                1.0 / dir.z
+            } else {
+                f32::INFINITY
+            },
         );
         let mut best: Option<RayHit> = None;
         let mut best_t = max_t;
@@ -328,7 +374,11 @@ impl CollisionWorld {
             if b.bottom() >= pos.y + height || b.top() <= pos.y + 0.35 {
                 continue;
             }
-            if pos.x + radius < b.min.x || pos.x - radius > b.max.x || pos.z + radius < b.min.z || pos.z - radius > b.max.z {
+            if pos.x + radius < b.min.x
+                || pos.x - radius > b.max.x
+                || pos.z + radius < b.min.z
+                || pos.z - radius > b.max.z
+            {
                 continue;
             }
             if b.overlaps_circle(pos, radius) {

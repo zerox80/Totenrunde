@@ -106,7 +106,14 @@ impl Sfx {
             HitFlesh => &["hit_flesh_1", "hit_flesh_2", "hit_flesh_3"],
             Headshot => &["headshot"],
             Impact => &["impact_1", "impact_2", "impact_3"],
-            ZombieGroan => &["z_groan_1", "z_groan_2", "z_groan_3", "z_groan_4", "z_groan_5", "z_groan_6"],
+            ZombieGroan => &[
+                "z_groan_1",
+                "z_groan_2",
+                "z_groan_3",
+                "z_groan_4",
+                "z_groan_5",
+                "z_groan_6",
+            ],
             ZombieAttack => &["z_attack_1", "z_attack_2", "z_attack_3"],
             ZombieScream => &["z_scream_1", "z_scream_2"],
             ZombieDeath => &["z_death_1", "z_death_2", "z_death_3", "z_death_4"],
@@ -168,9 +175,10 @@ impl Sfx {
             Step => 0.22,
             Heartbeat => 0.6,
             RoundStart | RoundEnd | GameOver => 0.9,
-            VoiceMaxAmmo | VoiceInstaKill | VoiceDoublePoints | VoiceNuke | VoiceCarpenter | VoiceFireSale => 1.0,
-            PerkJingleRevive | PerkJingleJugg | PerkJingleSpeed | PerkJingleDoubleTap | PerkJingleStamin
-            | PerkJingleMule => 0.55,
+            VoiceMaxAmmo | VoiceInstaKill | VoiceDoublePoints | VoiceNuke | VoiceCarpenter
+            | VoiceFireSale => 1.0,
+            PerkJingleRevive | PerkJingleJugg | PerkJingleSpeed | PerkJingleDoubleTap
+            | PerkJingleStamin | PerkJingleMule => 0.55,
             BoxMusic => 0.7,
             _ => 0.7,
         }
@@ -180,9 +188,10 @@ impl Sfx {
     pub fn pitch_jitter(self) -> f32 {
         use Sfx::*;
         match self {
-            RoundStart | RoundEnd | GameOver | BoxMusic | PerkJingleRevive | PerkJingleJugg | PerkJingleSpeed
-            | PerkJingleDoubleTap | PerkJingleStamin | PerkJingleMule | VoiceMaxAmmo | VoiceInstaKill
-            | VoiceDoublePoints | VoiceNuke | VoiceCarpenter | VoiceFireSale => 0.0,
+            RoundStart | RoundEnd | GameOver | BoxMusic | PerkJingleRevive | PerkJingleJugg
+            | PerkJingleSpeed | PerkJingleDoubleTap | PerkJingleStamin | PerkJingleMule
+            | VoiceMaxAmmo | VoiceInstaKill | VoiceDoublePoints | VoiceNuke | VoiceCarpenter
+            | VoiceFireSale => 0.0,
             ZombieGroan | ZombieAttack | ZombieDeath | ZombieScream => 0.12,
             _ => 0.05,
         }

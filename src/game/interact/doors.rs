@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 
-use super::{cost_text, try_buy, Focus, InteractKind, Interactable, Prompt};
+use super::{Focus, InteractKind, Interactable, Prompt, cost_text, try_buy};
 use crate::audio::SfxEvent;
 use crate::base::AppState;
 use crate::game::points::Score;
@@ -56,13 +56,19 @@ pub fn use_door(
             commands.entity(e).despawn();
         }
     }
-    let Some(InteractKind::Door(id)) = focus.kind else { return };
+    let Some(InteractKind::Door(id)) = focus.kind else {
+        return;
+    };
     let Some(e) = focus.entity else { return };
     let Ok((_, d)) = doors.get(e) else { return };
     if zones.is_door_open(id) {
         return;
     }
-    let what = if d.debris { "den Schutt wegzuräumen" } else { "die Tür zu öffnen" };
+    let what = if d.debris {
+        "den Schutt wegzuräumen"
+    } else {
+        "die Tür zu öffnen"
+    };
     prompt.set(format!("Halte F, um {what} {}", cost_text(d.cost)));
     if focus.pressed && try_buy(&mut score, d.cost, &mut sfx) {
         open.write(OpenDoor(id));

@@ -8,7 +8,7 @@ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 
 use crate::base::AppState;
 use crate::weapons::viewmodel::SCOPE_IN;
-use crate::weapons::{def, Loadout};
+use crate::weapons::{Loadout, def};
 
 #[derive(Component)]
 pub struct ScopeOverlay;
@@ -75,7 +75,11 @@ fn line(horizontal: bool, from: f32, len: f32, thick: f32) -> impl Bundle {
     (node, BackgroundColor(RETICLE))
 }
 
-pub fn spawn(mut commands: Commands, mut images: ResMut<Assets<Image>>, mut mask: Local<Option<Handle<Image>>>) {
+pub fn spawn(
+    mut commands: Commands,
+    mut images: ResMut<Assets<Image>>,
+    mut mask: Local<Option<Handle<Image>>>,
+) {
     let mask = mask.get_or_insert_with(|| images.add(mask_image())).clone();
     let bar = || {
         (
@@ -141,6 +145,10 @@ pub fn spawn(mut commands: Commands, mut images: ResMut<Assets<Image>>, mut mask
 pub fn update(lo: Single<&Loadout>, mut q: Query<&mut Visibility, With<ScopeOverlay>>) {
     let scoped = lo.current_slot().is_some_and(|s| def(s.weapon).scope) && lo.ads > SCOPE_IN;
     for mut v in q.iter_mut() {
-        v.set_if_neq(if scoped { Visibility::Inherited } else { Visibility::Hidden });
+        v.set_if_neq(if scoped {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        });
     }
 }

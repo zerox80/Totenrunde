@@ -60,7 +60,9 @@ fn load_level(
         .spawn((
             MapRoot,
             Name::new("Karte"),
-            WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(map.model.clone()))),
+            WorldAssetRoot(
+                asset_server.load(GltfAssetLabel::Scene(0).from_asset(map.model.clone())),
+            ),
         ))
         .observe(on_map_ready);
 
@@ -88,7 +90,11 @@ fn load_level(
     ));
 
     commands.insert_resource(GlobalAmbientLight {
-        color: Color::linear_rgb(map.ambient.color[0], map.ambient.color[1], map.ambient.color[2]),
+        color: Color::linear_rgb(
+            map.ambient.color[0],
+            map.ambient.color[1],
+            map.ambient.color[2],
+        ),
         // Das Umgebungslicht trifft nur noch bewegte Figuren (Zombies, Waffe, Türen); die
         // Karte selbst hat es in den Lightmaps. Gedämpft, damit Figuren nicht ausgewaschen wirken.
         brightness: map.ambient.brightness * if map.lightmaps.is_empty() { 1.0 } else { 0.4 },
@@ -100,7 +106,13 @@ fn load_level(
         map.fog.color[2],
     )));
 
-    spawn_map_lights(&mut commands, &map, settings.shadows || map.lightmaps.is_empty(), &mut meshes, &mut mats);
+    spawn_map_lights(
+        &mut commands,
+        &map,
+        settings.shadows || map.lightmaps.is_empty(),
+        &mut meshes,
+        &mut mats,
+    );
     commands.insert_resource(col);
     commands.insert_resource(nav);
     commands.insert_resource(map);
@@ -127,7 +139,11 @@ fn on_map_ready(
     let mut lit = 0;
     for e in children.iter_descendants(ready.entity) {
         if let Ok((parent, mat)) = meshes.get(e) {
-            let node = names.get(e).ok().map(|(n, _)| n.as_str()).filter(|n| lm_of.contains_key(n));
+            let node = names
+                .get(e)
+                .ok()
+                .map(|(n, _)| n.as_str())
+                .filter(|n| lm_of.contains_key(n));
             let node = node.or_else(|| names.get(parent.parent()).ok().map(|(n, _)| n.as_str()));
             if let Some((img, exposure)) = node.and_then(|n| lm_of.get(n)) {
                 commands.entity(e).insert(Lightmap {
@@ -146,7 +162,9 @@ fn on_map_ready(
         info!("Lightmaps auf {lit} Meshes angewendet");
     }
     for e in children.iter_descendants(ready.entity) {
-        let Ok((name, tf)) = names.get(e) else { continue };
+        let Ok((name, tf)) = names.get(e) else {
+            continue;
+        };
         for door in &map.doors {
             for part in &door.parts {
                 if part.node == name.as_str() {

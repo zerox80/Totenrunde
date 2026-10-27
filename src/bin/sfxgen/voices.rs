@@ -27,7 +27,11 @@ fn glottal(d: f32, f0: impl Fn(f32) -> f32, fry: f32, seed: u64) -> Vec<f32> {
         let f = f0(t) * (1.0 + jit);
         ph = (ph + f / SR).fract();
         // schmaler Puls mit Rauschanteil (heiser)
-        let pulse = if ph < 0.18 { (ph / 0.18 * std::f32::consts::PI).sin() } else { 0.0 };
+        let pulse = if ph < 0.18 {
+            (ph / 0.18 * std::f32::consts::PI).sin()
+        } else {
+            0.0
+        };
         let am = 1.0 - fry * (0.5 + 0.5 * (t * 31.0 * std::f32::consts::TAU).sin()).powi(3);
         out.push(pulse * am + rng.bi() * 0.25);
     }
@@ -35,25 +39,48 @@ fn glottal(d: f32, f0: impl Fn(f32) -> f32, fry: f32, seed: u64) -> Vec<f32> {
 }
 
 /// Zombie-Laut: Quelle -> zwei Vokale (überblendet) -> Verzerrung -> Raum
-fn creature(d: f32, f0: impl Fn(f32) -> f32 + Copy, v1: [(f32, f32, f32); 3], v2: [(f32, f32, f32); 3], fry: f32, breath: f32, dist: f32, seed: u64) -> Vec<f32> {
+fn creature(
+    d: f32,
+    f0: impl Fn(f32) -> f32 + Copy,
+    v1: [(f32, f32, f32); 3],
+    v2: [(f32, f32, f32); 3],
+    fry: f32,
+    breath: f32,
+    dist: f32,
+    seed: u64,
+) -> Vec<f32> {
     let mut rng = Rng::new(seed + 100);
     let src = glottal(d, f0, fry, seed);
     let a = formant(&src, v1);
     let b = formant(&src, v2);
-    let mut x: Vec<f32> = a.iter().zip(b.iter()).enumerate().map(|(i, (p, q))| {
-        let k = i as f32 / a.len() as f32;
-        p * (1.0 - k) + q * k
-    }).collect();
+    let mut x: Vec<f32> = a
+        .iter()
+        .zip(b.iter())
+        .enumerate()
+        .map(|(i, (p, q))| {
+            let k = i as f32 / a.len() as f32;
+            p * (1.0 - k) + q * k
+        })
+        .collect();
     let br = env(bandpass(noise(d, &mut rng), 1800.0, 0.7), |_, _| 1.0);
     x = mix(x, &br, breath);
     x = drive(normalize(x, 1.0), dist);
-    x = env(x, |t, d| (t / 0.06).min(1.0) * ((d - t) / (d * 0.35)).clamp(0.0, 1.0));
+    x = env(x, |t, d| {
+        (t / 0.06).min(1.0) * ((d - t) / (d * 0.35)).clamp(0.0, 1.0)
+    });
     x = biquad(x, Filt::Peak(5.0), 250.0, 1.0);
     fade(normalize(reverb(x, 0.9, 0.5, 0.18, 0.35), 0.9), 0.002, 0.05)
 }
 
 pub fn zombies(out: &mut Vec<(&'static str, Vec<f32>)>) {
-    let groans = ["z_groan_1", "z_groan_2", "z_groan_3", "z_groan_4", "z_groan_5", "z_groan_6"];
+    let groans = [
+        "z_groan_1",
+        "z_groan_2",
+        "z_groan_3",
+        "z_groan_4",
+        "z_groan_5",
+        "z_groan_6",
+    ];
     let vow = [(AH, UH), (UH, OH), (OH, AH), (EH, UH), (AH, OH), (UH, AH)];
     for (i, name) in groans.iter().enumerate() {
         let mut r = Rng::new(200 + i as u64);
@@ -61,27 +88,46 @@ pub fn zombies(out: &mut Vec<(&'static str, Vec<f32>)>) {
         let d = r.range(1.1, 2.0);
         let wob = r.range(2.0, 5.0);
         let f0 = move |t: f32| base * (1.0 + 0.12 * (t * wob).sin() - 0.15 * t / d);
-        out.push((name, creature(d, f0, vow[i].0, vow[i].1, 0.7, 0.35, 3.0, 200 + i as u64)));
+        out.push((
+            name,
+            creature(d, f0, vow[i].0, vow[i].1, 0.7, 0.35, 3.0, 200 + i as u64),
+        ));
     }
-    for (i, name) in ["z_attack_1", "z_attack_2", "z_attack_3"].iter().enumerate() {
+    for (i, name) in ["z_attack_1", "z_attack_2", "z_attack_3"]
+        .iter()
+        .enumerate()
+    {
         let mut r = Rng::new(300 + i as u64);
         let base = r.range(120.0, 170.0);
         let f0 = move |t: f32| base * (1.0 + 0.6 * (-t / 0.15).exp());
-        out.push((name, creature(0.75, f0, AH, EH, 0.5, 0.6, 5.0, 300 + i as u64)));
+        out.push((
+            name,
+            creature(0.75, f0, AH, EH, 0.5, 0.6, 5.0, 300 + i as u64),
+        ));
     }
     for (i, name) in ["z_scream_1", "z_scream_2"].iter().enumerate() {
         let base = 260.0 + i as f32 * 60.0;
-        let f0 = move |t: f32| base * (1.0 + 0.4 * (t / 1.2).min(1.0)) * (1.0 + 0.03 * (t * 40.0).sin());
-        out.push((name, creature(1.3, f0, AH, EH, 0.3, 0.9, 6.0, 400 + i as u64)));
+        let f0 =
+            move |t: f32| base * (1.0 + 0.4 * (t / 1.2).min(1.0)) * (1.0 + 0.03 * (t * 40.0).sin());
+        out.push((
+            name,
+            creature(1.3, f0, AH, EH, 0.3, 0.9, 6.0, 400 + i as u64),
+        ));
     }
-    for (i, name) in ["z_death_1", "z_death_2", "z_death_3", "z_death_4"].iter().enumerate() {
+    for (i, name) in ["z_death_1", "z_death_2", "z_death_3", "z_death_4"]
+        .iter()
+        .enumerate()
+    {
         let mut r = Rng::new(500 + i as u64);
         let base = r.range(110.0, 160.0);
         let d = r.range(0.8, 1.3);
         let f0 = move |t: f32| base * (1.0 - 0.55 * (t / d));
         let mut x = creature(d, f0, AH, UH, 0.9, 0.5, 4.0, 500 + i as u64);
         // Gurgeln am Ende
-        let gurgle = env(bandpass(brown(0.6, &mut r), 400.0, 2.0), ahr(0.05, 0.2, 0.3));
+        let gurgle = env(
+            bandpass(brown(0.6, &mut r), 400.0, 2.0),
+            ahr(0.05, 0.2, 0.3),
+        );
         x = mix_at(x, &gurgle, d * 0.6, 0.5);
         out.push((name, normalize(x, 0.9)));
     }
@@ -91,7 +137,10 @@ pub fn zombies(out: &mut Vec<(&'static str, Vec<f32>)>) {
         let mut dirt = silence(2.0);
         for _ in 0..60 {
             let at = rng.range(0.0, 1.6);
-            let g = env(lowpass(noise(0.08, &mut rng), rng.range(600.0, 1800.0)), decay(0.001, 0.02));
+            let g = env(
+                lowpass(noise(0.08, &mut rng), rng.range(600.0, 1800.0)),
+                decay(0.001, 0.02),
+            );
             dirt = mix_at(dirt, &g, at, rng.range(0.1, 0.4));
         }
         let groan = creature(1.6, |t| 80.0 * (1.0 + 0.2 * t), UH, AH, 0.8, 0.4, 3.0, 601);
@@ -102,7 +151,10 @@ pub fn zombies(out: &mut Vec<(&'static str, Vec<f32>)>) {
         for (i, name) in ["hurt_1", "hurt_2"].iter().enumerate() {
             let base = 140.0 + i as f32 * 20.0;
             let f0 = move |t: f32| base * (1.0 - 0.3 * t / 0.35);
-            out.push((name, creature(0.35, f0, EH, AH, 0.2, 0.5, 2.5, 700 + i as u64)));
+            out.push((
+                name,
+                creature(0.35, f0, EH, AH, 0.2, 0.5, 2.5, 700 + i as u64),
+            ));
         }
     }
     {

@@ -16,7 +16,7 @@
 //! * Leistungstests: `TR_TEXMAX=512`, `TR_MSAA=0`, `TR_SHADOWS=1`, `TR_NOLIGHTS=1`, `TR_NOWALL=1`
 
 use bevy::prelude::*;
-use bevy::render::view::screenshot::{save_to_disk, Screenshot};
+use bevy::render::view::screenshot::{Screenshot, save_to_disk};
 
 use super::{AppState, InGame};
 use crate::player::Player;
@@ -115,8 +115,12 @@ impl DebugConfig {
         }
         if let Ok(s) = std::env::var("TR_SCRIPT") {
             for part in s.split(';') {
-                let Some((t, a)) = part.split_once(':') else { continue };
-                let Ok(t) = t.trim().parse::<f32>() else { continue };
+                let Some((t, a)) = part.split_once(':') else {
+                    continue;
+                };
+                let Ok(t) = t.trim().parse::<f32>() else {
+                    continue;
+                };
                 let a = a.trim();
                 let action = if let Some(k) = a.strip_prefix("key=-") {
                     parse_key(k).map(ScriptAction::Release)
@@ -144,7 +148,9 @@ impl DebugConfig {
         c.god = std::env::var("TR_GOD").is_ok();
         c.start_round = std::env::var("TR_ROUND").ok().and_then(|s| s.parse().ok());
         c.start_points = std::env::var("TR_POINTS").ok().and_then(|s| s.parse().ok());
-        c.players = std::env::var("TR_PLAYERS").ok().and_then(|s| s.parse().ok());
+        c.players = std::env::var("TR_PLAYERS")
+            .ok()
+            .and_then(|s| s.parse().ok());
         c.start_power = std::env::var("TR_POWER").is_ok();
         c.active = !c.shots.is_empty() || c.exit_at.is_some() || !c.script.is_empty();
         c.no_input = c.active || std::env::var("TR_NOINPUT").is_ok();
@@ -222,7 +228,9 @@ fn timed_actions(
         .collect();
     for path in shots {
         info!("Screenshot: {path}");
-        commands.spawn(Screenshot::primary_window()).observe(save_to_disk(path));
+        commands
+            .spawn(Screenshot::primary_window())
+            .observe(save_to_disk(path));
     }
     if let Some(t) = cfg.exit_at {
         if now >= t {
@@ -295,7 +303,9 @@ fn menu_test(
         *shot_done = true;
         if let Ok(path) = std::env::var("TR_MENUSHOT") {
             info!("Menü-Screenshot: {path}");
-            commands.spawn(Screenshot::primary_window()).observe(save_to_disk(path));
+            commands
+                .spawn(Screenshot::primary_window())
+                .observe(save_to_disk(path));
         }
     }
     if *t > 3.0 && std::env::var("TR_MENUPLAY").is_ok() {

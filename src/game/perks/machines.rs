@@ -55,9 +55,11 @@ pub fn spawn_machines(mut commands: Commands, map: Res<MapFile>, asset_server: R
             ))
             .with_children(|p| {
                 // Automaten-Modell nur laden, wenn es schon gebaut ist
-                if crate::world::mapdata::asset_root().join(perk.model()).exists() {
+                if crate::world::mapdata::asset_exists(&perk.model()) {
                     p.spawn((
-                        WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(perk.model()))),
+                        WorldAssetRoot(
+                            asset_server.load(GltfAssetLabel::Scene(0).from_asset(perk.model())),
+                        ),
                         Transform::IDENTITY,
                     ));
                 }
@@ -75,11 +77,19 @@ pub fn spawn_machines(mut commands: Commands, map: Res<MapFile>, asset_server: R
     }
 }
 
-pub fn machine_lights(time: Res<Time>, power: Res<Power>, mut q: Query<(&MachineLight, &mut PointLight)>) {
+pub fn machine_lights(
+    time: Res<Time>,
+    power: Res<Power>,
+    mut q: Query<(&MachineLight, &mut PointLight)>,
+) {
     let t = time.elapsed_secs();
     for (m, mut l) in q.iter_mut() {
         let on = power.on || !m.perk.needs_power();
-        let target = if on { 90000.0 * (1.0 + (t * 3.0 + m.perk as u8 as f32).sin() * 0.06) } else { 0.0 };
+        let target = if on {
+            90000.0 * (1.0 + (t * 3.0 + m.perk as u8 as f32).sin() * 0.06)
+        } else {
+            0.0
+        };
         l.intensity += (target - l.intensity) * (time.delta_secs() * 3.0).min(1.0);
     }
 }
@@ -100,7 +110,10 @@ pub fn machine_jingles(
         if m.jingle_cd <= 0.0 {
             m.jingle_cd = rng.random_range(70.0..160.0);
             if tf.translation.distance(player.translation) < 22.0 {
-                sfx.write(SfxEvent::at(m.perk.jingle(), tf.translation + Vec3::Y * 1.5));
+                sfx.write(SfxEvent::at(
+                    m.perk.jingle(),
+                    tf.translation + Vec3::Y * 1.5,
+                ));
             }
         }
     }

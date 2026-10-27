@@ -55,7 +55,9 @@ pub fn use_repair(
         *timer = 0.0;
         return;
     };
-    let Some(b) = bars.list.iter_mut().find(|b| b.id == id) else { return };
+    let Some(b) = bars.list.iter_mut().find(|b| b.id == id) else {
+        return;
+    };
     if b.missing_boards() == 0 {
         *timer = 0.0;
         return;
@@ -65,7 +67,11 @@ pub fn use_repair(
         *timer = 0.0;
         return;
     }
-    let dur = if perks.has(Perk::SpeedCola) { REPAIR_TIME * 0.5 } else { REPAIR_TIME };
+    let dur = if perks.has(Perk::SpeedCola) {
+        REPAIR_TIME * 0.5
+    } else {
+        REPAIR_TIME
+    };
     *timer += time.delta_secs();
     if *timer >= dur {
         *timer = 0.0;

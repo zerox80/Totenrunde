@@ -3,8 +3,8 @@
 use bevy::prelude::*;
 use rand::Rng;
 
-use super::decals::{spawn_decal, Decal};
-use super::particles::{rand_dir, spawn_particle, Flash, Particle};
+use super::decals::{Decal, spawn_decal};
+use super::particles::{Flash, Particle, rand_dir, spawn_particle};
 use super::{FxAssets, FxEvent};
 use crate::base::AppState;
 use crate::world::collision::{CollisionWorld, F_BULLET};
@@ -24,7 +24,10 @@ pub fn handle_fx(
             FxEvent::Blood { pos, dir, amount } => {
                 let n = (6.0 * amount) as usize;
                 for _ in 0..n {
-                    let v = (dir * rng.random_range(1.0..3.5) + rand_dir(&mut rng) * 1.8 + Vec3::Y * 0.8) * amount.sqrt();
+                    let v = (dir * rng.random_range(1.0..3.5)
+                        + rand_dir(&mut rng) * 1.8
+                        + Vec3::Y * 0.8)
+                        * amount.sqrt();
                     spawn_particle(
                         &mut commands,
                         &fx.cube,
@@ -68,11 +71,27 @@ pub fn handle_fx(
                     let o = pos;
                     let d = (dir + Vec3::NEG_Y * 0.7).normalize();
                     if let Some(hit) = col.raycast(o, d, 3.0, F_BULLET) {
-                        spawn_decal(&mut commands, &fx, &fx.decal_blood, hit.point, hit.normal, rng.random_range(0.35..0.8), 40.0);
+                        spawn_decal(
+                            &mut commands,
+                            &fx,
+                            &fx.decal_blood,
+                            hit.point,
+                            hit.normal,
+                            rng.random_range(0.35..0.8),
+                            40.0,
+                        );
                         decal_count += 1;
                     } else if pos.y < 3.0 {
                         let ground = Vec3::new(pos.x + dir.x * 0.8, 0.0, pos.z + dir.z * 0.8);
-                        spawn_decal(&mut commands, &fx, &fx.decal_blood, ground, Vec3::Y, rng.random_range(0.4..0.9), 40.0);
+                        spawn_decal(
+                            &mut commands,
+                            &fx,
+                            &fx.decal_blood,
+                            ground,
+                            Vec3::Y,
+                            rng.random_range(0.4..0.9),
+                            40.0,
+                        );
                         decal_count += 1;
                     }
                 }
@@ -126,7 +145,8 @@ pub fn handle_fx(
                         &fx.spark,
                         pos + normal * 0.02,
                         Particle {
-                            vel: (normal + rand_dir(&mut rng) * 0.8).normalize() * rng.random_range(2.0..5.0),
+                            vel: (normal + rand_dir(&mut rng) * 0.8).normalize()
+                                * rng.random_range(2.0..5.0),
                             life: 0.0,
                             max_life: rng.random_range(0.08..0.2),
                             gravity: 6.0,
@@ -156,7 +176,15 @@ pub fn handle_fx(
                     },
                 );
                 if decal_count < 60 {
-                    spawn_decal(&mut commands, &fx, &fx.decal_hole, pos, normal, rng.random_range(0.04..0.07), 15.0);
+                    spawn_decal(
+                        &mut commands,
+                        &fx,
+                        &fx.decal_hole,
+                        pos,
+                        normal,
+                        rng.random_range(0.04..0.07),
+                        15.0,
+                    );
                     decal_count += 1;
                 }
             }
@@ -216,14 +244,26 @@ pub fn handle_fx(
                 }
                 if decal_count < 60 {
                     let g = Vec3::new(pos.x, 0.0, pos.z);
-                    spawn_decal(&mut commands, &fx, &fx.decal_hole, g, Vec3::Y, radius * 0.5, 30.0);
+                    spawn_decal(
+                        &mut commands,
+                        &fx,
+                        &fx.decal_hole,
+                        g,
+                        Vec3::Y,
+                        radius * 0.5,
+                        30.0,
+                    );
                     decal_count += 1;
                 }
             }
             FxEvent::RayImpact { pos, upgraded } => {
                 commands.spawn((
                     PointLight {
-                        color: if upgraded { Color::srgb(1.0, 0.3, 0.3) } else { Color::srgb(0.3, 1.0, 0.3) },
+                        color: if upgraded {
+                            Color::srgb(1.0, 0.3, 0.3)
+                        } else {
+                            Color::srgb(0.3, 1.0, 0.3)
+                        },
                         intensity: 1.5e6,
                         range: 8.0,
                         ..default()
@@ -240,7 +280,11 @@ pub fn handle_fx(
                     spawn_particle(
                         &mut commands,
                         &fx.quad,
-                        if upgraded { &fx.glow_red } else { &fx.glow_green },
+                        if upgraded {
+                            &fx.glow_red
+                        } else {
+                            &fx.glow_green
+                        },
                         pos,
                         Particle {
                             vel: rand_dir(&mut rng) * rng.random_range(1.0..4.0),
@@ -262,9 +306,17 @@ pub fn handle_fx(
                         &mut commands,
                         &fx.cube,
                         &fx.dirt,
-                        pos + Vec3::new(rng.random_range(-0.3..0.3), 0.05, rng.random_range(-0.3..0.3)),
+                        pos + Vec3::new(
+                            rng.random_range(-0.3..0.3),
+                            0.05,
+                            rng.random_range(-0.3..0.3),
+                        ),
                         Particle {
-                            vel: Vec3::new(rng.random_range(-1.0..1.0), rng.random_range(2.0..3.5), rng.random_range(-1.0..1.0)),
+                            vel: Vec3::new(
+                                rng.random_range(-1.0..1.0),
+                                rng.random_range(2.0..3.5),
+                                rng.random_range(-1.0..1.0),
+                            ),
                             life: 0.0,
                             max_life: 0.7,
                             gravity: 9.0,

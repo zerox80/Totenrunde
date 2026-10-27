@@ -19,10 +19,17 @@ impl Plugin for TexturePlugin {
 
 /// Bilder ohne Mipmaps (z. B. Lightmaps, UI-Grafik), erkannt am Dateipfad.
 fn skip_path(path: &str) -> bool {
-    path.contains("/lm_") || path.starts_with("lm_") || path.starts_with("ui/") || path.contains("fonts/")
+    path.contains("/lm_")
+        || path.starts_with("lm_")
+        || path.starts_with("ui/")
+        || path.contains("fonts/")
 }
 
-fn add_mipmaps(mut events: MessageReader<AssetEvent<Image>>, mut images: ResMut<Assets<Image>>, server: Res<AssetServer>) {
+fn add_mipmaps(
+    mut events: MessageReader<AssetEvent<Image>>,
+    mut images: ResMut<Assets<Image>>,
+    server: Res<AssetServer>,
+) {
     let ids: Vec<AssetId<Image>> = events
         .read()
         .filter_map(|e| match e {
@@ -31,10 +38,14 @@ fn add_mipmaps(mut events: MessageReader<AssetEvent<Image>>, mut images: ResMut<
         })
         .collect();
     for id in ids {
-        let Some(path) = server.get_path(id) else { continue };
+        let Some(path) = server.get_path(id) else {
+            continue;
+        };
         let path = path.path().to_string_lossy().replace('\\', "/");
         let is_lightmap = path.contains("lm_");
-        let Some(mut img) = images.get_mut(id) else { continue };
+        let Some(mut img) = images.get_mut(id) else {
+            continue;
+        };
         if is_lightmap {
             // Lightmaps: weich filtern, an den Rändern nicht wiederholen
             img.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
@@ -59,7 +70,9 @@ fn add_mipmaps(mut events: MessageReader<AssetEvent<Image>>, mut images: ResMut<
         if w < 64 || h < 64 || img.texture_descriptor.size.depth_or_array_layers != 1 {
             continue;
         }
-        let Some(data) = img.data.as_ref() else { continue };
+        let Some(data) = img.data.as_ref() else {
+            continue;
+        };
         if data.len() != w * h * 4 {
             continue;
         }
@@ -114,7 +127,13 @@ fn build_mips(base: &[u8], w: usize, h: usize, srgb: bool) -> (Vec<u8>, u32) {
     build_mips_levels(base, w, h, srgb, u32::MAX)
 }
 
-fn build_mips_levels(base: &[u8], w: usize, h: usize, srgb: bool, max_levels: u32) -> (Vec<u8>, u32) {
+fn build_mips_levels(
+    base: &[u8],
+    w: usize,
+    h: usize,
+    srgb: bool,
+    max_levels: u32,
+) -> (Vec<u8>, u32) {
     let to_lin: Vec<f32> = (0..256)
         .map(|i| {
             let c = i as f32 / 255.0;
@@ -152,7 +171,12 @@ fn build_mips_levels(base: &[u8], w: usize, h: usize, srgb: bool, max_levels: u3
             for x in 0..nw {
                 let x0 = (x * 2).min(cw - 1);
                 let x1 = (x * 2 + 1).min(cw - 1);
-                let i = [(y0 * cw + x0) * 4, (y0 * cw + x1) * 4, (y1 * cw + x0) * 4, (y1 * cw + x1) * 4];
+                let i = [
+                    (y0 * cw + x0) * 4,
+                    (y0 * cw + x1) * 4,
+                    (y1 * cw + x0) * 4,
+                    (y1 * cw + x1) * 4,
+                ];
                 let o = (y * nw + x) * 4;
                 for c in 0..3 {
                     let s: f32 = i.iter().map(|&k| to_lin[cur[k + c] as usize]).sum::<f32>() * 0.25;

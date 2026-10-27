@@ -14,7 +14,12 @@ pub struct BlobAssets {
     mat: Handle<StandardMaterial>,
 }
 
-pub fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut mats: ResMut<Assets<StandardMaterial>>, mut images: ResMut<Assets<Image>>) {
+pub fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut mats: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
+) {
     let n = 64u32;
     let mut data = Vec::with_capacity((n * n * 4) as usize);
     for y in 0..n {
@@ -27,7 +32,11 @@ pub fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut mats:
         }
     }
     let img = images.add(Image::new(
-        Extent3d { width: n, height: n, depth_or_array_layers: 1 },
+        Extent3d {
+            width: n,
+            height: n,
+            depth_or_array_layers: 1,
+        },
         TextureDimension::D2,
         data,
         TextureFormat::Rgba8UnormSrgb,
@@ -46,7 +55,11 @@ pub fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut mats:
     });
 }
 
-pub fn attach(mut commands: Commands, blob: Option<Res<BlobAssets>>, added: Query<Entity, Added<Zombie>>) {
+pub fn attach(
+    mut commands: Commands,
+    blob: Option<Res<BlobAssets>>,
+    added: Query<Entity, Added<Zombie>>,
+) {
     let Some(blob) = blob else { return };
     for z in added.iter() {
         commands.spawn((

@@ -8,7 +8,7 @@ use crate::audio::{Sfx, SfxEvent};
 use crate::base::debug::DebugConfig;
 use crate::game::perks::{Perk, Perks};
 use crate::game::points::Score;
-use crate::weapons::{enter_last_stand, leave_last_stand, Loadout};
+use crate::weapons::{Loadout, enter_last_stand, leave_last_stand};
 
 pub const REGEN_DELAY: f32 = 2.8;
 pub const REVIVE_TIME: f32 = 10.0;
@@ -73,7 +73,11 @@ pub fn player_health(
     let (ref mut p, ref mut h, tf, ref mut lo) = *q;
     h.since_hit += dt;
     h.hurt_flash = (h.hurt_flash - dt * 0.9).max(0.0);
-    h.max = if perks.has(Perk::Juggernog) { 250.0 } else { 100.0 };
+    h.max = if perks.has(Perk::Juggernog) {
+        250.0
+    } else {
+        100.0
+    };
 
     for ev in events.read() {
         if h.downed || h.dead || cfg.god {
@@ -121,7 +125,11 @@ pub fn player_health(
         return;
     }
     // Regeneration
-    let regen_delay = if perks.has(Perk::QuickRevive) { REGEN_DELAY * 0.5 } else { REGEN_DELAY };
+    let regen_delay = if perks.has(Perk::QuickRevive) {
+        REGEN_DELAY * 0.5
+    } else {
+        REGEN_DELAY
+    };
     if h.since_hit > regen_delay && h.hp < h.max {
         h.hp = (h.hp + dt * 110.0).min(h.max);
     }

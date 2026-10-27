@@ -15,8 +15,11 @@ use bevy::prelude::*;
 
 use crate::base::{AppState, GameSet, InGame};
 
-pub use defs::{def, weapon_index, WeaponClass, WEAPONS};
-pub use loadout::{enter_last_stand, leave_last_stand, take_current, GiveWeapon, Loadout, WState, WeaponSlot, MAX_GRENADES};
+pub use defs::{WEAPONS, WeaponClass, def, weapon_index};
+pub use loadout::{
+    GiveWeapon, Loadout, MAX_GRENADES, WState, WeaponSlot, enter_last_stand, leave_last_stand,
+    take_current,
+};
 pub use projectiles::explode;
 pub use viewmodel::VM_SCALE;
 
@@ -32,7 +35,12 @@ impl Plugin for WeaponsPlugin {
             .add_systems(Startup, assets::setup_weapon_assets)
             .add_systems(
                 OnEnter(AppState::Playing),
-                (loadout::spawn_loadout, viewmodel::spawn_viewmodel, viewmodel::spawn_bottle).after(crate::player::spawn_player),
+                (
+                    loadout::spawn_loadout,
+                    viewmodel::spawn_viewmodel,
+                    viewmodel::spawn_bottle,
+                )
+                    .after(crate::player::spawn_player),
             )
             .add_systems(
                 Update,
@@ -52,7 +60,11 @@ impl Plugin for WeaponsPlugin {
             )
             .add_systems(
                 Update,
-                (viewmodel::sync_viewmodel, viewmodel::animate_viewmodel, viewmodel::animate_bottle)
+                (
+                    viewmodel::sync_viewmodel,
+                    viewmodel::animate_viewmodel,
+                    viewmodel::animate_bottle,
+                )
                     .chain()
                     .in_set(GameSet::Ui)
                     .run_if(in_state(AppState::Playing))

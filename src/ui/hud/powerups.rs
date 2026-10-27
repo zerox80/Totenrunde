@@ -3,8 +3,8 @@
 use bevy::prelude::*;
 
 use super::widgets::label;
-use crate::base::assets::GameAssets;
 use crate::base::AppState;
+use crate::base::assets::GameAssets;
 use crate::game::powerups::ActivePowerups;
 
 #[derive(Component, Clone, Copy, PartialEq)]
@@ -31,7 +31,11 @@ pub fn spawn(mut commands: Commands, assets: Res<GameAssets>) {
             DespawnOnExit(AppState::Playing),
         ))
         .with_children(|p| {
-            for (b, txt) in [(PuBadge::Insta, "TOD"), (PuBadge::Double, "×2"), (PuBadge::FireSale, "%")] {
+            for (b, txt) in [
+                (PuBadge::Insta, "TOD"),
+                (PuBadge::Double, "×2"),
+                (PuBadge::FireSale, "%"),
+            ] {
                 p.spawn((
                     b,
                     Node {
@@ -55,7 +59,12 @@ pub fn spawn(mut commands: Commands, assets: Res<GameAssets>) {
                         BorderColor::all(Color::srgb(0.4, 1.0, 0.35)),
                         BackgroundColor(Color::srgba(0.05, 0.25, 0.05, 0.75)),
                     ))
-                    .with_child(label(txt, &assets.font_black, 22.0, Color::srgb(0.75, 1.0, 0.7)));
+                    .with_child(label(
+                        txt,
+                        &assets.font_black,
+                        22.0,
+                        Color::srgb(0.75, 1.0, 0.7),
+                    ));
                     c.spawn((PuTime(b), label("", &assets.font_bold, 16.0, Color::WHITE)));
                 });
             }
@@ -76,7 +85,11 @@ pub fn update(
     for (b, mut v) in badges.iter_mut() {
         let l = left(*b);
         let blink = l < 5.0 && (time.elapsed_secs() * 6.0).fract() < 0.4;
-        let want = if l > 0.0 && !blink { Visibility::Inherited } else { Visibility::Hidden };
+        let want = if l > 0.0 && !blink {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
         if *v != want {
             *v = want;
         }

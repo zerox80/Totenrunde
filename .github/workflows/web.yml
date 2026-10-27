@@ -1,0 +1,93 @@
+name: WebAssembly und Container
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  CARGO_TERM_COLOR: always
+  IMAGE_NAME: ghcr.io/zerox80/totenrunde-web
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: web
+      - name: Linux-Bibliotheken
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends binaryen pkg-config libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+      - name: Wasm-Bindgen installieren
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen@0.2.129
+      - name: Formatierung
+        run: |
+          cargo fmt --all --check
+          cargo fmt --manifest-path backend/Cargo.toml --check
+      - name: Desktop und WebAssembly prüfen
+        run: |
+          cargo clippy --locked --bin totenrunde
+          cargo clippy --locked --target wasm32-unknown-unknown --bin totenrunde
+      - name: Backend prüfen und testen
+        run: |
+          cargo clippy --locked --manifest-path backend/Cargo.toml -- -D warnings
+          cargo test --locked --manifest-path backend/Cargo.toml
+      - name: Optimiertes WebAssembly bauen
+        run: |
+          cargo build --release --locked --target wasm32-unknown-unknown --bin totenrunde
+          wasm-bindgen --target web --out-name totenrunde \
+            --out-dir backend/web/pkg \
+            target/wasm32-unknown-unknown/release/totenrunde.wasm
+          wasm-opt -Oz backend/web/pkg/totenrunde_bg.wasm \
+            -o backend/web/pkg/totenrunde_bg.wasm
+          wasm-opt backend/web/pkg/totenrunde_bg.wasm -o /dev/null
+
+  image:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Bei GHCR anmelden
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image-Metadaten
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - name: Image bauen und veröffentlichen
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max

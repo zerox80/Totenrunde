@@ -8,7 +8,7 @@ use crate::audio::{Sfx, SfxEvent};
 use crate::fx::FxEvent;
 use crate::player::{Player, PlayerDamage};
 use crate::world::collision::{CollisionWorld, F_BULLET};
-use crate::zombies::{raycast_zombies, DamageKind, HitPart, Zombie, ZombieHit, ZombieRig};
+use crate::zombies::{DamageKind, HitPart, Zombie, ZombieHit, ZombieRig, raycast_zombies};
 
 #[derive(Component)]
 pub struct ProjectileBody {
@@ -61,14 +61,20 @@ pub fn explode(
         hits.write(ZombieHit {
             zombie: e,
             damage: damage * k,
-            part: if d < radius * 0.3 { HitPart::Head } else { HitPart::Torso },
+            part: if d < radius * 0.3 {
+                HitPart::Head
+            } else {
+                HitPart::Torso
+            },
             kind: DamageKind::Explosive,
             point: c,
             dir: (c - pos).normalize_or(Vec3::Y),
         });
     }
     let pd = (player_pos + Vec3::Y * 0.9 - pos).length();
-    if pd < radius * 0.75 && col.line_clear(pos + Vec3::Y * 0.2, player_pos + Vec3::Y * 1.0, F_BULLET) {
+    if pd < radius * 0.75
+        && col.line_clear(pos + Vec3::Y * 0.2, player_pos + Vec3::Y * 1.0, F_BULLET)
+    {
         let amount = (1.0 - pd / (radius * 0.75)) * 70.0;
         if amount > 5.0 {
             dmg.write(PlayerDamage { amount, from: pos });
@@ -169,7 +175,10 @@ pub fn update_projectiles(
         if let Some(at) = explode_at {
             match p.kind {
                 Projectile::RayBolt => {
-                    fx.write(FxEvent::RayImpact { pos: at, upgraded: p.upgraded });
+                    fx.write(FxEvent::RayImpact {
+                        pos: at,
+                        upgraded: p.upgraded,
+                    });
                     sfx.write(SfxEvent::at(Sfx::Explosion, at).vol(0.35).pitch(1.6));
                     for (ze, z, ztf, _) in zombies.iter() {
                         if !z.alive() {
@@ -190,11 +199,26 @@ pub fn update_projectiles(
                     }
                     let pd = (ppos + Vec3::Y - at).length();
                     if pd < p.splash * 0.8 {
-                        dmg.write(PlayerDamage { amount: 25.0, from: at });
+                        dmg.write(PlayerDamage {
+                            amount: 25.0,
+                            from: at,
+                        });
                     }
                 }
                 _ => {
-                    explode(at, p.splash, p.splash_damage, &zombies, &col, ppos, &mut hits, &mut fx, &mut sfx, &mut dmg, true);
+                    explode(
+                        at,
+                        p.splash,
+                        p.splash_damage,
+                        &zombies,
+                        &col,
+                        ppos,
+                        &mut hits,
+                        &mut fx,
+                        &mut sfx,
+                        &mut dmg,
+                        true,
+                    );
                 }
             }
             commands.entity(e).despawn();

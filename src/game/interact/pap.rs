@@ -4,12 +4,12 @@
 
 use bevy::prelude::*;
 
-use super::{cost_text, try_buy, Focus, InteractKind, Interactable, Prompt};
+use super::{Focus, InteractKind, Interactable, Prompt, cost_text, try_buy};
 use crate::audio::{Sfx, SfxEvent};
 use crate::base::AppState;
 use crate::game::points::Score;
-use crate::weapons::{def, take_current, GiveWeapon, Loadout, WeaponSlot};
-use crate::world::mapdata::{asset_root, MapFile};
+use crate::weapons::{GiveWeapon, Loadout, WeaponSlot, def, take_current};
+use crate::world::mapdata::{MapFile, asset_exists};
 use crate::world::power::Power;
 
 pub const PAP_COST: u32 = 5000;
@@ -42,11 +42,18 @@ pub fn spawn_pap(
     let tf = pl.transform();
     let fwd = pl.forward();
     let root = commands
-        .spawn((Name::new("Waffen-Verstärker"), tf, Visibility::default(), DespawnOnExit(AppState::Playing)))
+        .spawn((
+            Name::new("Waffen-Verstärker"),
+            tf,
+            Visibility::default(),
+            DespawnOnExit(AppState::Playing),
+        ))
         .id();
-    if asset_root().join("models/pap.gltf").exists() {
+    if asset_exists("models/pap.gltf") {
         commands.entity(root).with_child((
-            WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/pap.gltf"))),
+            WorldAssetRoot(
+                asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/pap.gltf")),
+            ),
             Transform::IDENTITY,
         ));
     } else {
@@ -116,12 +123,17 @@ pub fn use_pap(
     }
     match pap.phase {
         PapPhase::Idle => {
-            let Some(slot) = lo.current_slot().copied() else { return };
+            let Some(slot) = lo.current_slot().copied() else {
+                return;
+            };
             if slot.upgraded {
                 prompt.set("Diese Waffe ist bereits aufgewertet");
                 return;
             }
-            prompt.set(format!("Halte F, um die Waffe aufzuwerten {}", cost_text(PAP_COST)));
+            prompt.set(format!(
+                "Halte F, um die Waffe aufzuwerten {}",
+                cost_text(PAP_COST)
+            ));
             if focus.pressed && lo.can_act() && try_buy(&mut score, PAP_COST, &mut sfx) {
                 if let Some(slot) = take_current(&mut lo) {
                     pap.phase = PapPhase::Working { t: 0.0, slot };
@@ -129,8 +141,11 @@ pub fn use_pap(
                     let e = commands
                         .spawn((
                             super::WorldWeapon,
-                            WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(def(slot.weapon).model()))),
-                            Transform::from_xyz(0.0, 1.05, -0.6).with_rotation(Quat::from_rotation_y(std::f32::consts::FRAC_PI_2)),
+                            WorldAssetRoot(asset_server.load(
+                                GltfAssetLabel::Scene(0).from_asset(def(slot.weapon).model()),
+                            )),
+                            Transform::from_xyz(0.0, 1.05, -0.6)
+                                .with_rotation(Quat::from_rotation_y(std::f32::consts::FRAC_PI_2)),
                             ChildOf(pap.root),
                         ))
                         .observe(super::hide_weapon_hands)
@@ -143,7 +158,10 @@ pub fn use_pap(
         PapPhase::Ready { slot, .. } => {
             prompt.set(format!("Halte F für {}", def(slot.weapon).pap_name));
             if focus.pressed {
-                give.write(GiveWeapon { weapon: slot.weapon, upgraded: true });
+                give.write(GiveWeapon {
+                    weapon: slot.weapon,
+                    upgraded: true,
+                });
                 pap.phase = PapPhase::Idle;
                 if let Some(d) = pap.display.take() {
                     commands.entity(d).despawn();
@@ -191,7 +209,8 @@ pub fn animate_pap(
             if let Some(d) = pap.display {
                 if let Ok(mut d) = tfs.get_mut(d) {
                     // kommt heraus, zieht sich am Ende wieder zurück
-                    let out = (t / 0.8).min(1.0) * (1.0 - ((t - (TAKE_TIME - 1.5)) / 1.5).clamp(0.0, 1.0));
+                    let out = (t / 0.8).min(1.0)
+                        * (1.0 - ((t - (TAKE_TIME - 1.5)) / 1.5).clamp(0.0, 1.0));
                     d.translation.z = -0.6 * out;
                 }
             }

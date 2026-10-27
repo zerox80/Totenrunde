@@ -7,15 +7,23 @@ use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions};
 
 use super::{CameraFov, Player};
+use crate::base::InGame;
 use crate::base::debug::DebugConfig;
 use crate::base::settings::Settings;
-use crate::base::InGame;
 
 /// Maus im Spiel fangen und verstecken, im Menü / in der Pause freigeben.
-pub fn cursor_grab(mut cursor: Single<&mut CursorOptions>, ingame: Option<Res<InGame>>, windows: Query<&Window>) {
+pub fn cursor_grab(
+    mut cursor: Single<&mut CursorOptions>,
+    ingame: Option<Res<InGame>>,
+    windows: Query<&Window>,
+) {
     let focused = windows.iter().any(|w| w.focused);
     let want = ingame.map(|g| !g.paused).unwrap_or(false) && focused;
-    let mode = if want { CursorGrabMode::Locked } else { CursorGrabMode::None };
+    let mode = if want {
+        CursorGrabMode::Locked
+    } else {
+        CursorGrabMode::None
+    };
     if cursor.grab_mode != mode {
         cursor.grab_mode = mode;
         cursor.visible = !want;
@@ -38,10 +46,19 @@ pub fn mouse_look(
     let dt = time.delta_secs();
     // Starke Vergrößerung (Zielfernrohr) zusätzlich mit dem Zoom verlangsamen; Kimme und
     // Korn (Zoom ab 0.75) behalten die eingestellte Ziel-Empfindlichkeit.
-    let zoom = fov.iter().next().map(|f| f.current / settings.fov_deg.to_radians()).unwrap_or(1.0);
+    let zoom = fov
+        .iter()
+        .next()
+        .map(|f| f.current / settings.fov_deg.to_radians())
+        .unwrap_or(1.0);
     let scope = (zoom / 0.75).min(1.0);
-    let sens = settings.sensitivity * 0.0022 * (1.0 - p.ads * (1.0 - settings.ads_sensitivity)) * scope;
-    let d = if cfg.no_input { Vec2::ZERO } else { motion.delta };
+    let sens =
+        settings.sensitivity * 0.0022 * (1.0 - p.ads * (1.0 - settings.ads_sensitivity)) * scope;
+    let d = if cfg.no_input {
+        Vec2::ZERO
+    } else {
+        motion.delta
+    };
     p.yaw -= d.x * sens;
     p.pitch -= d.y * sens * if settings.invert_y { -1.0 } else { 1.0 };
     // Rückstoß abbauen

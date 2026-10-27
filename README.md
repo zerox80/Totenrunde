@@ -23,6 +23,28 @@ Fertige Pakete für **Windows** und **Linux** gibt es unter
 `Totenrunde.exe` (Windows) bzw. `Totenrunde` (Linux) doppelklicken. Der Ordner `assets` muss neben
 der Programmdatei liegen. Benötigt wird eine Grafikkarte mit Vulkan oder DirectX 12.
 
+## Im Browser spielen (WebAssembly)
+
+Der Web-Port verwendet denselben Bevy-Spielcode und rendert per WebGL 2. Ein Axum-Server liefert Wasm, JavaScript und Assets aus einem Container-Image aus.
+
+```bash
+docker compose -f backend/compose.yaml up --build -d
+```
+
+Danach ist das Spiel unter <http://localhost:8080> erreichbar. Einstellungen werden im Browser in `localStorage` gespeichert. Für Maussteuerung und Audio auf die Spielansicht klicken; empfohlen wird ein aktueller Desktop-Browser mit WebGL 2 und aktivierter Hardware-Beschleunigung.
+
+Beim ersten Start wählt der Browser anhand der verfügbaren CPU-Kerne grob eine Grafikstufe. **Niedrig** rendert mit 50 %, **Mittel** mit 75 % und **Hoch/Extrem** mit 100 % der physischen Auflösung. Unter **GRAFIK → RENDERAUFLÖSUNG** lässt sich das jederzeit manuell ändern; gespeicherte Einstellungen haben Vorrang. Die CPU-Erkennung ist nur eine Starthilfe und keine Messung der GPU-Leistung. Auto Exposure ist im WebGL2-Port deaktiviert, weil dieses Bevy-Feature Compute-Shader benötigt.
+
+Docker und CI erzeugen Release-Wasm mit LTO und optimieren es zusätzlich mit `wasm-opt -Oz`. Dadurch werden weder die riesige Debug-Datei noch unoptimierter Spielcode ausgeliefert.
+
+Das fertige GHCR-Image kann ohne Quellcode aus `~/Dokumente/Projekte/Totenstille-compose` gestartet werden:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Details zum lokalen Wasm-Build und zur Konfiguration stehen in `backend/README.md`. Der Workflow `.github/workflows/web.yml` prüft Desktop und Wasm, testet das Backend und veröffentlicht das Image bei `main` und Versions-Tags in GHCR.
+
 ## Selbst bauen und spielen
 
 ```bash

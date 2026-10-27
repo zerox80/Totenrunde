@@ -95,10 +95,21 @@ fn spawn_crosshair(mut commands: Commands) {
                 ..default()
             })
             .with_children(|c| {
-                for (w, h, x, y) in [(2.0, 9.0, 0.0, -10.0), (2.0, 9.0, 0.0, 10.0), (9.0, 2.0, -10.0, 0.0), (9.0, 2.0, 10.0, 0.0)] {
+                for (w, h, x, y) in [
+                    (2.0, 9.0, 0.0, -10.0),
+                    (2.0, 9.0, 0.0, 10.0),
+                    (9.0, 2.0, -10.0, 0.0),
+                    (9.0, 2.0, 10.0, 0.0),
+                ] {
                     c.spawn((
                         CrossLine(Vec2::new(x, y) / 10.0),
-                        BoxShadow::new(Color::srgba(0.0, 0.0, 0.0, 0.6), Val::Px(0.0), Val::Px(0.0), Val::Px(1.0), Val::Px(1.5)),
+                        BoxShadow::new(
+                            Color::srgba(0.0, 0.0, 0.0, 0.6),
+                            Val::Px(0.0),
+                            Val::Px(0.0),
+                            Val::Px(1.0),
+                            Val::Px(1.5),
+                        ),
                         Node {
                             position_type: PositionType::Absolute,
                             width: px(w),
@@ -141,7 +152,10 @@ fn crosshair_visibility(
     mut gap: Local<f32>,
 ) {
     let show = player.ads < 0.3;
-    let base = lo.current_slot().map(|s| crate::weapons::def(s.weapon).spread_hip).unwrap_or(2.0);
+    let base = lo
+        .current_slot()
+        .map(|s| crate::weapons::def(s.weapon).spread_hip)
+        .unwrap_or(2.0);
     let want = 6.0 + base * 3.0 + player.bob * 14.0 + lo.bloom * 6.0;
     *gap += (want - *gap) * (time.delta_secs() * 12.0).min(1.0);
     for (l, mut n) in lines.iter_mut() {
@@ -152,7 +166,11 @@ fn crosshair_visibility(
         n.top = Val::Px(y - h / 2.0);
     }
     for mut v in q.iter_mut() {
-        let want = if show { Visibility::Inherited } else { Visibility::Hidden };
+        let want = if show {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
         if *v != want {
             *v = want;
         }

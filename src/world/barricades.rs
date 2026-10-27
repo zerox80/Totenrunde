@@ -145,7 +145,9 @@ pub fn spawn_barricades(
             let fy = spec.sill + h * (0.12 + 0.76 * (i as f32 / (BOARDS - 1) as f32));
             let tilt = rng.random_range(-0.35f32..0.35) + if i % 2 == 0 { 0.12 } else { -0.12 };
             let shift = rng.random_range(-0.08f32..0.08);
-            let pos = Vec3::new(center.x, fy, center.z) + inward * (0.19 + i as f32 * 0.008) + right * shift;
+            let pos = Vec3::new(center.x, fy, center.z)
+                + inward * (0.19 + i as f32 * 0.008)
+                + right * shift;
             let len = spec.width + 0.35 + rng.random_range(0.0..0.15);
             let tf = Transform::from_translation(pos)
                 .with_rotation(rot * Quat::from_rotation_z(tilt))
@@ -188,7 +190,9 @@ fn animate_boards(
     for b in bars.list.iter_mut() {
         let outward = (b.outside - b.inside).normalize_or_zero();
         for i in 0..BOARDS {
-            let Ok((mut tf, mut vis)) = boards.get_mut(b.board_entities[i]) else { continue };
+            let Ok((mut tf, mut vis)) = boards.get_mut(b.board_entities[i]) else {
+                continue;
+            };
             let rest = b.board_rest[i];
             match b.boards[i] {
                 BoardState::Intact => {
@@ -201,12 +205,17 @@ fn animate_boards(
                 BoardState::Tearing(t) => {
                     let t = t + dt;
                     if t < 0.02 {
-                        events.write(BoardEvent::Torn { pos: rest.translation });
+                        events.write(BoardEvent::Torn {
+                            pos: rest.translation,
+                        });
                     }
                     // nach außen gerissen, fällt und dreht sich
                     let k = t / 0.45;
-                    tf.translation = rest.translation + outward * (k * 1.6) + Vec3::Y * (k * 0.5 - k * k * 1.6);
-                    tf.rotation = rest.rotation * Quat::from_rotation_x(k * 2.5) * Quat::from_rotation_z(k * 1.2);
+                    tf.translation =
+                        rest.translation + outward * (k * 1.6) + Vec3::Y * (k * 0.5 - k * k * 1.6);
+                    tf.rotation = rest.rotation
+                        * Quat::from_rotation_x(k * 2.5)
+                        * Quat::from_rotation_z(k * 1.2);
                     if t >= 0.45 {
                         b.boards[i] = BoardState::Gone;
                         *vis = Visibility::Hidden;
@@ -218,15 +227,19 @@ fn animate_boards(
                 BoardState::Repairing(t) => {
                     let t = t + dt;
                     let k = (t / 0.35).min(1.0);
-                    let start = rest.translation - outward * 0.9 + Vec3::new(0.0, -rest.translation.y + 0.1, 0.0);
-                    let p = start.lerp(rest.translation, k) + Vec3::Y * ((k * std::f32::consts::PI).sin() * 0.4);
+                    let start = rest.translation - outward * 0.9
+                        + Vec3::new(0.0, -rest.translation.y + 0.1, 0.0);
+                    let p = start.lerp(rest.translation, k)
+                        + Vec3::Y * ((k * std::f32::consts::PI).sin() * 0.4);
                     tf.translation = p;
                     tf.rotation = rest.rotation * Quat::from_rotation_x((1.0 - k) * 1.5);
                     tf.scale = rest.scale;
                     *vis = Visibility::Inherited;
                     if k >= 1.0 {
                         b.boards[i] = BoardState::Intact;
-                        events.write(BoardEvent::Repaired { pos: rest.translation });
+                        events.write(BoardEvent::Repaired {
+                            pos: rest.translation,
+                        });
                     } else {
                         b.boards[i] = BoardState::Repairing(t);
                     }

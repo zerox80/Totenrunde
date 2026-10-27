@@ -6,8 +6,8 @@ use bevy::prelude::*;
 use super::defs::def;
 use super::loadout::{Loadout, WState};
 use crate::audio::{Sfx, SfxEvent};
-use crate::base::settings::Settings;
 use crate::base::InGame;
+use crate::base::settings::Settings;
 use crate::game::perks::{Perk, Perks};
 use crate::player::{CameraFov, Player};
 
@@ -42,10 +42,16 @@ pub fn weapon_input(
         (lo.ads - dt * ads_speed).max(0.0)
     };
     pl.ads = lo.ads;
-    let zoom = lo.current_slot().map(|s| def(s.weapon).ads_zoom).unwrap_or(1.0);
+    let zoom = lo
+        .current_slot()
+        .map(|s| def(s.weapon).ads_zoom)
+        .unwrap_or(1.0);
     let base_fov = settings.fov_deg.to_radians();
     fov.target = base_fov * (1.0 - (1.0 - zoom) * lo.ads);
-    pl.weapon_mobility = lo.current_slot().map(|s| def(s.weapon).mobility).unwrap_or(1.0);
+    pl.weapon_mobility = lo
+        .current_slot()
+        .map(|s| def(s.weapon).mobility)
+        .unwrap_or(1.0);
 
     if pl.sprinting {
         lo.sprint_out = 0.22;
@@ -131,7 +137,11 @@ pub fn weapon_input(
         }
         WState::Busy { t, dur } => {
             let t = t + dt;
-            lo.state = if t >= dur { WState::Raising { t: 0.0 } } else { WState::Busy { t, dur } };
+            lo.state = if t >= dur {
+                WState::Raising { t: 0.0 }
+            } else {
+                WState::Busy { t, dur }
+            };
         }
         WState::Melee { .. } | WState::Throw { .. } => {}
         WState::Ready | WState::Empty => {}
@@ -161,7 +171,10 @@ pub fn weapon_input(
     }
     if let Some(to) = switch_to {
         if to != lo.current && to < n {
-            lo.state = WState::Lowering { t: 0.0, to: Some(to) };
+            lo.state = WState::Lowering {
+                t: 0.0,
+                to: Some(to),
+            };
             lo.burst_left = 0;
             return;
         }
@@ -171,19 +184,32 @@ pub fn weapon_input(
         start_reload(lo, speed_cola, &mut sfx);
     }
     // Messer
-    if keys.just_pressed(KeyCode::KeyV) && matches!(lo.state, WState::Ready | WState::ShellReload { .. } | WState::Empty) {
+    if keys.just_pressed(KeyCode::KeyV)
+        && matches!(
+            lo.state,
+            WState::Ready | WState::ShellReload { .. } | WState::Empty
+        )
+    {
         lo.state = WState::Melee { t: 0.0, hit: false };
         sfx.write(SfxEvent::ui(Sfx::KnifeSwing));
     }
     // Granate
-    if keys.just_pressed(KeyCode::KeyG) && lo.grenades > 0 && matches!(lo.state, WState::Ready | WState::Empty) {
-        lo.state = WState::Throw { t: 0.0, thrown: false };
+    if keys.just_pressed(KeyCode::KeyG)
+        && lo.grenades > 0
+        && matches!(lo.state, WState::Ready | WState::Empty)
+    {
+        lo.state = WState::Throw {
+            t: 0.0,
+            thrown: false,
+        };
         sfx.write(SfxEvent::ui(Sfx::GrenadePin).vol(0.7));
     }
 }
 
 pub fn start_reload(lo: &mut Loadout, speed_cola: bool, sfx: &mut MessageWriter<SfxEvent>) {
-    let Some(s) = lo.current_slot().copied() else { return };
+    let Some(s) = lo.current_slot().copied() else {
+        return;
+    };
     let d = def(s.weapon);
     if s.mag >= d.mag_size(s.upgraded) || s.reserve == 0 {
         return;

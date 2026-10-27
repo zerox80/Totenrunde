@@ -5,7 +5,6 @@ use bevy::prelude::*;
 use super::{HitPart, Zombie, ZombieRig};
 use crate::world::shapes::{ray_capsule, ray_sphere};
 
-
 /// Ein Treffer eines Strahls auf einen Zombie.
 #[derive(Clone, Copy, Debug)]
 pub struct RayZombieHit {
@@ -35,7 +34,9 @@ pub fn raycast_zombies(
         }
         let Some(rig) = rig else {
             // Modell noch nicht bereit: einfache Kapsel
-            if let Some(t) = ray_capsule(origin, dir, base + Vec3::Y * 0.3, base + Vec3::Y * 1.5, 0.3) {
+            if let Some(t) =
+                ray_capsule(origin, dir, base + Vec3::Y * 0.3, base + Vec3::Y * 1.5, 0.3)
+            {
                 if t <= max_t {
                     hits.push(RayZombieHit {
                         zombie: e,
@@ -61,15 +62,36 @@ pub fn raycast_zombies(
             }
         };
         if !z.headless {
-            test(ray_sphere(origin, dir, head + up * 0.11, 0.135), HitPart::Head);
+            test(
+                ray_sphere(origin, dir, head + up * 0.11, 0.135),
+                HitPart::Head,
+            );
         }
-        test(ray_capsule(origin, dir, neck - up * 0.02, head + up * 0.02, 0.075), HitPart::Neck);
-        test(ray_capsule(origin, dir, hips, chest + (chest - hips) * 0.35, 0.2), HitPart::Torso);
+        test(
+            ray_capsule(origin, dir, neck - up * 0.02, head + up * 0.02, 0.075),
+            HitPart::Neck,
+        );
+        test(
+            ray_capsule(origin, dir, hips, chest + (chest - hips) * 0.35, 0.2),
+            HitPart::Torso,
+        );
         for s in 0..2 {
-            test(ray_capsule(origin, dir, p(rig.upper_arm[s]), p(rig.lower_arm[s]), 0.075), HitPart::Limb);
-            test(ray_capsule(origin, dir, p(rig.lower_arm[s]), p(rig.hand[s]), 0.065), HitPart::Limb);
-            test(ray_capsule(origin, dir, p(rig.upper_leg[s]), p(rig.lower_leg[s]), 0.1), HitPart::Limb);
-            test(ray_capsule(origin, dir, p(rig.lower_leg[s]), p(rig.foot[s]), 0.075), HitPart::Limb);
+            test(
+                ray_capsule(origin, dir, p(rig.upper_arm[s]), p(rig.lower_arm[s]), 0.075),
+                HitPart::Limb,
+            );
+            test(
+                ray_capsule(origin, dir, p(rig.lower_arm[s]), p(rig.hand[s]), 0.065),
+                HitPart::Limb,
+            );
+            test(
+                ray_capsule(origin, dir, p(rig.upper_leg[s]), p(rig.lower_leg[s]), 0.1),
+                HitPart::Limb,
+            );
+            test(
+                ray_capsule(origin, dir, p(rig.lower_leg[s]), p(rig.foot[s]), 0.075),
+                HitPart::Limb,
+            );
         }
         if let Some((t, part)) = best {
             hits.push(RayZombieHit { zombie: e, t, part });

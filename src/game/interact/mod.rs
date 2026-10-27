@@ -60,7 +60,12 @@ impl Plugin for InteractPlugin {
             )
             .add_systems(
                 Update,
-                (power::animate_power_switch, mystery_box::animate_box, pap::animate_pap, wallbuy::chalk_glow)
+                (
+                    power::animate_power_switch,
+                    mystery_box::animate_box,
+                    pap::animate_pap,
+                    wallbuy::chalk_glow,
+                )
                     .in_set(GameSet::World)
                     .run_if(in_state(AppState::Playing))
                     .run_if(resource_exists::<InGame>),

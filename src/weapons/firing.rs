@@ -8,19 +8,25 @@ use bevy::prelude::*;
 use rand::Rng;
 
 use super::assets::WeaponAssets;
-use super::defs::{def, FireMode, Projectile, WeaponClass};
+use super::defs::{FireMode, Projectile, WeaponClass, def};
 use super::input::start_reload;
 use super::loadout::{Loadout, WState};
-use super::projectiles::{explode, ProjectileBody, Tracer};
+use super::projectiles::{ProjectileBody, Tracer, explode};
 use crate::audio::{Sfx, SfxEvent};
 use crate::base::{AppState, InGame};
 use crate::fx::FxEvent;
 use crate::game::perks::{Perk, Perks};
 use crate::player::{Player, PlayerCamera, PlayerDamage};
 use crate::world::collision::{CollisionWorld, F_BULLET};
-use crate::zombies::{raycast_zombies, DamageKind, HitPart, Zombie, ZombieHit, ZombieRig};
+use crate::zombies::{DamageKind, HitPart, Zombie, ZombieHit, ZombieRig, raycast_zombies};
 
-pub fn spread_dir(forward: Vec3, up: Vec3, right: Vec3, spread_deg: f32, rng: &mut impl Rng) -> Vec3 {
+pub fn spread_dir(
+    forward: Vec3,
+    up: Vec3,
+    right: Vec3,
+    spread_deg: f32,
+    rng: &mut impl Rng,
+) -> Vec3 {
     if spread_deg <= 0.0 {
         return forward;
     }
@@ -62,9 +68,13 @@ pub fn fire_weapons(
     lo.kick = (lo.kick - dt * 6.0).max(0.0);
 
     // --- Schießen ---
-    let Some(slot) = lo.current_slot().copied() else { return };
+    let Some(slot) = lo.current_slot().copied() else {
+        return;
+    };
     let d = def(slot.weapon);
-    let can_fire = matches!(lo.state, WState::Ready | WState::ShellReload { .. }) && lo.sprint_out <= 0.0 && !pl.sprinting;
+    let can_fire = matches!(lo.state, WState::Ready | WState::ShellReload { .. })
+        && lo.sprint_out <= 0.0
+        && !pl.sprinting;
     let trigger = match d.fire {
         FireMode::Auto => mouse.pressed(MouseButton::Left),
         FireMode::Semi => mouse.just_pressed(MouseButton::Left),
@@ -93,7 +103,9 @@ pub fn fire_weapons(
         lo.state = WState::Ready;
     }
     let double_tap = perks.has(Perk::DoubleTap);
-    let rpm = d.rpm * if slot.upgraded { d.pap.rpm_mult } else { 1.0 } * if double_tap { 1.33 } else { 1.0 };
+    let rpm = d.rpm
+        * if slot.upgraded { d.pap.rpm_mult } else { 1.0 }
+        * if double_tap { 1.33 } else { 1.0 };
     lo.fire_cd = 60.0 / rpm;
     if let FireMode::Burst(_) = d.fire {
         lo.burst_left -= 1;
@@ -108,21 +120,35 @@ pub fn fire_weapons(
     lo.flash = 0.05;
     lo.kick = 1.0;
 
-    let dmg_mult = (if slot.upgraded { d.pap.damage_mult } else { 1.0 }) * if double_tap { 2.0 } else { 1.0 };
+    let dmg_mult = (if slot.upgraded {
+        d.pap.damage_mult
+    } else {
+        1.0
+    }) * if double_tap { 2.0 } else { 1.0 };
     let crouch_bonus = match pl.stance {
         crate::player::Stance::Stand => 1.0,
         crate::player::Stance::Crouch => 0.75,
         crate::player::Stance::Prone => 0.55,
     };
     let move_pen = if pl.moving { 1.25 } else { 1.0 };
-    let spread = (d.spread_hip * (1.0 - lo.ads) + d.spread_ads * lo.ads) * crouch_bonus * move_pen + lo.bloom * (1.0 - lo.ads * 0.8);
+    let spread = (d.spread_hip * (1.0 - lo.ads) + d.spread_ads * lo.ads) * crouch_bonus * move_pen
+        + lo.bloom * (1.0 - lo.ads * 0.8);
     lo.bloom = (lo.bloom + d.recoil * 0.25).min(3.0);
 
-    let splash = if slot.upgraded && d.pap.splash > 0.0 { d.pap.splash } else { d.splash };
+    let splash = if slot.upgraded && d.pap.splash > 0.0 {
+        d.pap.splash
+    } else {
+        d.splash
+    };
     let splash_damage = if slot.upgraded && d.pap.splash > 0.0 {
         d.pap.splash_damage
     } else {
-        d.splash_damage * if slot.upgraded { d.pap.damage_mult } else { 1.0 }
+        d.splash_damage
+            * if slot.upgraded {
+                d.pap.damage_mult
+            } else {
+                1.0
+            }
     };
 
     let sound_pitch = if slot.upgraded { 0.92 } else { 1.0 };
@@ -139,7 +165,11 @@ pub fn fire_weapons(
                 let max_hits = 1 + d.penetration as usize + if slot.upgraded { 1 } else { 0 };
                 let mut splash_at: Option<Vec3> = None;
                 for (i, h) in zh.iter().take(max_hits).enumerate() {
-                    let falloff = if h.t > d.range { (1.0 - (h.t - d.range) / d.range * 0.5).max(0.5) } else { 1.0 };
+                    let falloff = if h.t > d.range {
+                        (1.0 - (h.t - d.range) / d.range * 0.5).max(0.5)
+                    } else {
+                        1.0
+                    };
                     let part_mult = match h.part {
                         HitPart::Head => d.head_mult,
                         HitPart::Neck => 2.0,
@@ -156,7 +186,15 @@ pub fn fire_weapons(
                         dir,
                     });
                     sfx.write(
-                        SfxEvent::at(if h.part == HitPart::Head { Sfx::Headshot } else { Sfx::HitFlesh }, point).vol(0.8),
+                        SfxEvent::at(
+                            if h.part == HitPart::Head {
+                                Sfx::Headshot
+                            } else {
+                                Sfx::HitFlesh
+                            },
+                            point,
+                        )
+                        .vol(0.8),
                     );
                     pen_mult *= 0.7;
                     if i == 0 && splash > 0.0 {
@@ -175,7 +213,19 @@ pub fn fire_weapons(
                     }
                 }
                 if let Some(p) = splash_at {
-                    explode(p, splash, splash_damage, &zombies, &col, ptf.translation, &mut hits, &mut fx, &mut sfx, &mut dmg, false);
+                    explode(
+                        p,
+                        splash,
+                        splash_damage,
+                        &zombies,
+                        &col,
+                        ptf.translation,
+                        &mut hits,
+                        &mut fx,
+                        &mut sfx,
+                        &mut dmg,
+                        false,
+                    );
                 }
                 // Leuchtspur (jede dritte Kugel)
                 if lo.shots % 3 == 0 && d.pellets == 1 {
@@ -211,13 +261,21 @@ pub fn fire_weapons(
                     thrown: false,
                 },
                 Mesh3d(wa.bolt_mesh.clone()),
-                MeshMaterial3d(if slot.upgraded { wa.bolt_red.clone() } else { wa.bolt_green.clone() }),
+                MeshMaterial3d(if slot.upgraded {
+                    wa.bolt_red.clone()
+                } else {
+                    wa.bolt_green.clone()
+                }),
                 Transform::from_translation(origin + dir * 0.6 + right * 0.05 - up * 0.05)
                     .looking_to(dir, Vec3::Y)
                     .with_rotation(Quat::from_rotation_arc(Vec3::Y, dir)),
                 NotShadowCaster,
                 PointLight {
-                    color: if slot.upgraded { Color::srgb(1.0, 0.3, 0.3) } else { Color::srgb(0.3, 1.0, 0.3) },
+                    color: if slot.upgraded {
+                        Color::srgb(1.0, 0.3, 0.3)
+                    } else {
+                        Color::srgb(0.3, 1.0, 0.3)
+                    },
                     intensity: 300000.0,
                     range: 6.0,
                     ..default()
@@ -250,7 +308,10 @@ pub fn fire_weapons(
     // Rückstoß
     let side = rng.random_range(-1.0..1.0) * d.recoil_side;
     let ads_k = 1.0 - lo.ads * 0.35;
-    pl.recoil_vel += Vec2::new(d.recoil.to_radians() * 14.0 * ads_k, side.to_radians() * 14.0 * ads_k);
+    pl.recoil_vel += Vec2::new(
+        d.recoil.to_radians() * 14.0 * ads_k,
+        side.to_radians() * 14.0 * ads_k,
+    );
     if d.class == WeaponClass::Sniper || d.class == WeaponClass::Shotgun {
         pl.shake = (pl.shake + 0.3).min(1.0);
     }

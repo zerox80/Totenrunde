@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 
-use super::{ZState, Zombie, ZOMBIE_RADIUS};
+use super::{ZOMBIE_RADIUS, ZState, Zombie};
 use crate::player::Player;
 use crate::world::collision::{CollisionWorld, F_ZOMBIE};
 use crate::world::nav::NavGrid;
@@ -18,7 +18,10 @@ pub fn update_flow(
 ) {
     timer.0 -= time.delta_secs();
     let cell = nav.index_of(player.translation);
-    if timer.0 <= 0.0 || nav.goal_cell.is_none() || (cell.is_some() && cell != nav.goal_cell && timer.0 < 0.15) {
+    if timer.0 <= 0.0
+        || nav.goal_cell.is_none()
+        || (cell.is_some() && cell != nav.goal_cell && timer.0 < 0.15)
+    {
         timer.0 = 0.25;
         nav.compute_flow(player.translation);
     }

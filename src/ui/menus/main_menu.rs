@@ -2,9 +2,9 @@
 
 use bevy::prelude::*;
 
-use super::widgets::{button, root, text, MenuAction, BLOOD};
-use crate::base::assets::GameAssets;
+use super::widgets::{BLOOD, MenuAction, button, root, text};
 use crate::base::AppState;
+use crate::base::assets::GameAssets;
 
 pub struct MainMenuPlugin;
 

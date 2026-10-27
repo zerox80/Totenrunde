@@ -9,10 +9,10 @@ use bevy::prelude::*;
 use bevy::world_serialization::WorldInstanceReady;
 use rand::Rng;
 
-use super::{SpeedClass, ZState, Zombie, ZombieRig};
 use super::anim::ZombieAnimState;
-use crate::base::assets::ZombieAnims;
+use super::{SpeedClass, ZState, Zombie, ZombieRig};
 use crate::base::AppState;
+use crate::base::assets::ZombieAnims;
 
 /// Wurzel der Modell-Instanz eines Zombies (Kind der Zombie-Entity).
 #[derive(Component)]
@@ -113,8 +113,12 @@ fn on_zombie_ready(
     mut zmats: ResMut<ZombieMats>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let Ok(model) = models.get(ready.entity) else { return };
-    let Ok(zombie) = zombies.get(model.zombie) else { return };
+    let Ok(model) = models.get(ready.entity) else {
+        return;
+    };
+    let Ok(zombie) = zombies.get(model.zombie) else {
+        return;
+    };
     let mut by_name: HashMap<String, Entity> = HashMap::new();
     let mut player = None;
     for e in children.iter_descendants(ready.entity) {
@@ -155,9 +159,9 @@ fn on_zombie_ready(
                         }
                     }
                     if !zmats.pants.is_empty() {
-                        commands
-                            .entity(e)
-                            .insert(MeshMaterial3d(zmats.pants[(v / 7) % zmats.pants.len()].clone()));
+                        commands.entity(e).insert(MeshMaterial3d(
+                            zmats.pants[(v / 7) % zmats.pants.len()].clone(),
+                        ));
                     }
                 }
                 _ => {}
@@ -173,7 +177,9 @@ fn on_zombie_ready(
     if let Some(s) = stump {
         commands.entity(s).insert(Visibility::Hidden);
     }
-    let Some(anims) = anims.models.get(zombie.model) else { return };
+    let Some(anims) = anims.models.get(zombie.model) else {
+        return;
+    };
     if let Ok(mut ap) = anim_players.get_mut(player) {
         let mut tr = AnimationTransitions::new();
         let first = match zombie.state {
