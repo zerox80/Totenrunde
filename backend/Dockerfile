@@ -21,7 +21,7 @@ RUN cargo build --release --locked
 
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends curl ca-certificates \
+    && apt-get install --yes --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 app \
     && useradd --uid 10001 --gid app --no-create-home app
@@ -32,8 +32,10 @@ COPY --chown=app:app backend/web/ /app/web/
 COPY --chown=app:app assets/ /app/assets/
 COPY --chown=app:app LICENSE /app/LICENSE
 USER app
-ENV HOST=0.0.0.0 PORT=8080 WEB_ROOT=/app/web ASSET_ROOT=/app/assets
-EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl --fail --silent --show-error http://127.0.0.1:8080/api/health || exit 1
+ENV HOST=0.0.0.0 PORT=8443 WEB_ROOT=/app/web ASSET_ROOT=/app/assets \
+    TLS_CERT_PATH=/certs/fullchain.pem TLS_KEY_PATH=/certs/privkey.pem \
+    TLS_SERVER_NAME=localhost
+EXPOSE 8443/udp
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD ["/app/totenrunde-web", "--healthcheck"]
 ENTRYPOINT ["/app/totenrunde-web"]

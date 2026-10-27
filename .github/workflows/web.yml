@@ -43,6 +43,12 @@ jobs:
         run: |
           cargo clippy --locked --bin totenrunde
           cargo clippy --locked --target wasm32-unknown-unknown --bin totenrunde
+      - name: Installer und Deployment prüfen
+        run: |
+          python3 -m py_compile backend/install.py
+          python3 backend/install.py --dry-run --non-interactive --domain spiel.example.de --email admin@example.de
+          sh -n backend/certbot-deploy.sh
+          docker compose --env-file backend/.env.example -f backend/compose.yaml config --quiet
       - name: Backend prüfen und testen
         run: |
           cargo clippy --locked --manifest-path backend/Cargo.toml -- -D warnings

@@ -5,7 +5,13 @@ services:
       dockerfile: backend/Dockerfile
     image: ${IMAGE:-ghcr.io/zerox80/totenrunde-web}:${TAG:-latest}
     ports:
-      - "${PORT:-8080}:8080"
+      - "${PORT:-8443}:8443/udp"
+    environment:
+      TLS_SERVER_NAME: ${TLS_SERVER_NAME:-localhost}
+      TLS_CERT_PATH: /certs/fullchain.pem
+      TLS_KEY_PATH: /certs/privkey.pem
+    volumes:
+      - "${CERT_DIR:-./certs}:/certs:ro"
     restart: unless-stopped
     read_only: true
     tmpfs:
@@ -15,8 +21,8 @@ services:
     cap_drop:
       - ALL
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8080/api/health"]
+      test: ["CMD", "/app/totenrunde-web", "--healthcheck"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       start_period: 10s
       retries: 3

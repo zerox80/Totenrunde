@@ -6,9 +6,17 @@ description = "Statischer Web-Server und Health-API für den Totenrunde-Wasm-Por
 
 [dependencies]
 axum = "0.8"
+bytes = "1"
+h3 = "0.0.8"
+h3-quinn = "0.0.10"
+http-body-util = "0.1"
+quinn = "0.11.12"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+rustls-pemfile = "2"
 serde_json = "1"
-tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal"] }
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "time"] }
+tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["compression-br", "compression-gzip", "fs"] }
 
 [dev-dependencies]
-tower = { version = "0.5", features = ["util"] }
+rcgen = "0.13"

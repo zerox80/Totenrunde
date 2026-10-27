@@ -1,7 +1,10 @@
+mod http3;
+
 use std::{
     env,
-    net::{IpAddr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     path::PathBuf,
+    time::Duration,
 };
 
 use axum::{
@@ -21,23 +24,55 @@ use tower_http::{
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let host = env::var("HOST")
         .unwrap_or_else(|_| "127.0.0.1".to_owned())
         .parse::<IpAddr>()?;
     let port = env::var("PORT")
-        .unwrap_or_else(|_| "8080".to_owned())
+        .unwrap_or_else(|_| "8443".to_owned())
         .parse::<u16>()?;
-    let web_root = configured_root("WEB_ROOT", "/app/web", local_web_root());
-    let asset_root = configured_root("ASSET_ROOT", "/app/assets", local_asset_root());
-    let address = SocketAddr::from((host, port));
-    let listener = tokio::net::TcpListener::bind(address).await?;
+    let cert_path = env::var_os("TLS_CERT_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/certs/fullchain.pem"));
+    let key_path = env::var_os("TLS_KEY_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/certs/privkey.pem"));
+    let server_name = env::var("TLS_SERVER_NAME").unwrap_or_else(|_| "localhost".to_owned());
 
-    println!("Totenrunde-Web lauscht auf http://{address}");
-    axum::serve(listener, router(web_root, asset_root))
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
-    Ok(())
+    match env::args().nth(1).as_deref() {
+        Some("--healthcheck") => {
+            let address = healthcheck_address(host, port);
+            tokio::time::timeout(
+                Duration::from_secs(5),
+                http3::healthcheck(address, &cert_path, &server_name),
+            )
+            .await
+            .map_err(|_| "HTTP/3-Healthcheck überschritt fünf Sekunden")??;
+            Ok(())
+        }
+        None => {
+            let web_root = configured_root("WEB_ROOT", "/app/web", local_web_root());
+            let asset_root = configured_root("ASSET_ROOT", "/app/assets", local_asset_root());
+            http3::serve(
+                SocketAddr::from((host, port)),
+                router(web_root, asset_root),
+                &cert_path,
+                &key_path,
+            )
+            .await?;
+            Ok(())
+        }
+        Some(argument) => Err(format!("Unbekanntes Argument: {argument}").into()),
+    }
+}
+
+fn healthcheck_address(host: IpAddr, port: u16) -> SocketAddr {
+    let address = match host {
+        IpAddr::V4(address) if address.is_unspecified() => IpAddr::V4(Ipv4Addr::LOCALHOST),
+        IpAddr::V6(address) if address.is_unspecified() => IpAddr::V6(Ipv6Addr::LOCALHOST),
+        address => address,
+    };
+    SocketAddr::from((address, port))
 }
 
 pub fn router(web_root: PathBuf, asset_root: PathBuf) -> Router {
@@ -164,30 +199,6 @@ fn local_asset_root() -> PathBuf {
         .parent()
         .expect("Backend liegt im Projektverzeichnis")
         .join("assets")
-}
-
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Strg+C-Handler konnte nicht installiert werden");
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("SIGTERM-Handler konnte nicht installiert werden")
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        () = ctrl_c => {},
-        () = terminate => {},
-    }
 }
 
 #[cfg(test)]

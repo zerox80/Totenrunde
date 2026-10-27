@@ -25,25 +25,22 @@ der Programmdatei liegen. Benötigt wird eine Grafikkarte mit Vulkan oder Direct
 
 ## Im Browser spielen (WebAssembly)
 
-Der Web-Port verwendet denselben Bevy-Spielcode und rendert per WebGL 2. Ein Axum-Server liefert Wasm, JavaScript und Assets aus einem Container-Image aus.
+Der Web-Port verwendet denselben Bevy-Spielcode und rendert per WebGL 2. Axum, `h3` und Quinn liefern Wasm, JavaScript und Assets ausschließlich per **HTTP/3 über QUIC/UDP** aus; Nginx sowie HTTP/1.1- und HTTP/2-Fallbacks sind nicht erforderlich.
+
+Für die einfachste Installation wird das fertige GHCR-Image ohne Quellcode aus `~/Dokumente/Projekte/Totenstille-compose` verwendet. Der geführte Installer unterstützt Ubuntu 24.04+ und Rocky Linux 10+, richtet Docker, Certbot, UFW/firewalld und automatische TLS-Erneuerung ein:
 
 ```bash
-docker compose -f backend/compose.yaml up --build -d
+cd ~/Dokumente/Projekte/Totenstille-compose
+python3 install.py
 ```
 
-Danach ist das Spiel unter <http://localhost:8080> erreichbar. Einstellungen werden im Browser in `localStorage` gespeichert. Für Maussteuerung und Audio auf die Spielansicht klicken; empfohlen wird ein aktueller Desktop-Browser mit WebGL 2 und aktivierter Hardware-Beschleunigung.
+Dafür werden eine öffentliche Domain sowie freigegebene Ports `TCP/80` (Zertifikatsprüfung) und `UDP/443` (Spiel) benötigt. Danach ist das Spiel unter `https://DEINE_DOMAIN` erreichbar. Einstellungen werden im Browser in `localStorage` gespeichert. Für Maussteuerung und Audio auf die Spielansicht klicken; empfohlen wird ein aktueller Desktop-Browser mit HTTP/3, WebGL 2 und aktivierter Hardware-Beschleunigung.
 
 Beim ersten Start wählt der Browser anhand der verfügbaren CPU-Kerne grob eine Grafikstufe. **Niedrig** rendert mit 50 %, **Mittel** mit 75 % und **Hoch/Extrem** mit 100 % der physischen Auflösung. Unter **GRAFIK → RENDERAUFLÖSUNG** lässt sich das jederzeit manuell ändern; gespeicherte Einstellungen haben Vorrang. Die CPU-Erkennung ist nur eine Starthilfe und keine Messung der GPU-Leistung. Auto Exposure ist im WebGL2-Port deaktiviert, weil dieses Bevy-Feature Compute-Shader benötigt.
 
 Docker und CI erzeugen Release-Wasm mit LTO und optimieren es zusätzlich mit `wasm-opt -Oz`. Dadurch werden weder die riesige Debug-Datei noch unoptimierter Spielcode ausgeliefert.
 
-Das fertige GHCR-Image kann ohne Quellcode aus `~/Dokumente/Projekte/Totenstille-compose` gestartet werden:
-
-```bash
-docker compose pull && docker compose up -d
-```
-
-Details zum lokalen Wasm-Build und zur Konfiguration stehen in `backend/README.md`. Der Workflow `.github/workflows/web.yml` prüft Desktop und Wasm, testet das Backend und veröffentlicht das Image bei `main` und Versions-Tags in GHCR.
+Details zum lokalen Wasm-Build, selbstsignierten Protokolltests und zur Konfiguration stehen in `backend/README.md`. Der Workflow `.github/workflows/web.yml` prüft Desktop, Wasm, Backend, Installer und Compose-Datei und veröffentlicht das Image bei `main` und Versions-Tags in GHCR.
 
 ## Selbst bauen und spielen
 
