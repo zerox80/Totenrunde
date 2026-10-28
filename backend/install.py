@@ -267,7 +267,7 @@ def configure_firewall(installer, system, port, ssh_port):
         installer.run(["ufw", "status", "verbose"])
     else:
         installer.run(["systemctl", "enable", "--now", "firewalld"])
-        installer.run(["firewall-cmd", "--permanent", "--add-service=ssh"])
+        installer.run(["firewall-cmd", "--permanent", f"--add-port={ssh_port}/tcp"])
         installer.run(["firewall-cmd", "--permanent", "--add-port=80/tcp"])
         installer.run(["firewall-cmd", "--permanent", f"--add-port={port}/udp"])
         installer.run(["firewall-cmd", "--reload"])
