@@ -67,7 +67,7 @@ Der Spieledienst selbst öffnet niemals TCP/80. Certbot Standalone verwendet die
 
 ## Lokaler Wasm-Build und Server
 
-Vorausgesetzt werden Rust, OpenSSL, das Wasm-Ziel, `wasm-bindgen-cli` in exakt der zur Root-Crate passenden Version und `wasm-opt` aus Binaryen. Vom Projektroot aus:
+Vorausgesetzt werden Rust, OpenSSL, das Wasm-Ziel, `wasm-bindgen-cli` in exakt der zur Root-Crate passenden Version und `wasm-opt` aus Binaryen. Nicht das Paket aus Debian bookworm verwenden: Dessen Version 108 lenkt den Tabellen-Export von wasm-bindgen um, im Browser erscheint dann `WebAssembly.Table.grow(): failed to grow table`. `sudo sh backend/install-binaryen.sh` installiert die auch von Docker und CI genutzte geprüfte Version. Vom Projektroot aus:
 
 ```sh
 rustup target add wasm32-unknown-unknown
@@ -78,6 +78,7 @@ wasm-bindgen --target web --out-name totenrunde \
   target/wasm32-unknown-unknown/release/totenrunde.wasm
 wasm-opt -Oz backend/web/pkg/totenrunde_bg.wasm \
   -o backend/web/pkg/totenrunde_bg.wasm
+python3 backend/check-wasm.py backend/web/pkg/totenrunde_bg.wasm
 TLS_CERT_PATH="$PWD/backend/certs/fullchain.pem" \
 TLS_KEY_PATH="$PWD/backend/certs/privkey.pem" \
 TLS_SERVER_NAME=localhost PORT=8443 \

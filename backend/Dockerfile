@@ -1,8 +1,7 @@
 FROM rust:1.97-bookworm AS wasm-builder
 WORKDIR /build
-RUN apt-get update \
-    && apt-get install --yes --no-install-recommends binaryen \
-    && rm -rf /var/lib/apt/lists/* \
+COPY backend/install-binaryen.sh /tmp/install-binaryen.sh
+RUN sh /tmp/install-binaryen.sh \
     && rustup target add wasm32-unknown-unknown \
     && cargo install wasm-bindgen-cli --version 0.2.129 --locked
 COPY Cargo.toml Cargo.lock build.rs ./
