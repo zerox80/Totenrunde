@@ -235,7 +235,14 @@ fn cache_policy(uri: &Uri) -> HeaderValue {
     if path.starts_with("/api/") {
         return HeaderValue::from_static("no-store");
     }
-    if path == "/" || path.ends_with('/') || path.ends_with(".html") {
+    // Spielcode muss nach einem Update sofort neu geladen werden; JS und Wasm passen nur
+    // zusammen. Unverändert antwortet der Server per Last-Modified mit 304.
+    if path == "/"
+        || path.ends_with('/')
+        || path.ends_with(".html")
+        || path.ends_with(".js")
+        || path.ends_with(".wasm")
+    {
         return HeaderValue::from_static("no-cache");
     }
     if is_versioned(uri) {

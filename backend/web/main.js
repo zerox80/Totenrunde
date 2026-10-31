@@ -5,6 +5,30 @@ const error = document.getElementById("error");
 const errorMessage = document.getElementById("error-message");
 const canvas = document.getElementById("game-canvas");
 
+// Ohne Hardwarebeschleunigung rendert der Browser auf der CPU; das Spiel ist dann unspielbar
+// langsam, auch auf schnellen Rechnern. Darauf deutlich hinweisen.
+function warnIfSoftwareRendering() {
+  const gl = document.createElement("canvas").getContext("webgl2");
+  const info = gl && gl.getExtension("WEBGL_debug_renderer_info");
+  const renderer = info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : "";
+  gl?.getExtension("WEBGL_lose_context")?.loseContext();
+  console.info("WebGL2-Renderer:", renderer || "unbekannt");
+  if (!/swiftshader|llvmpipe|softpipe|software|basic render/i.test(renderer)) {
+    return;
+  }
+  const hint = document.createElement("div");
+  hint.setAttribute("role", "alert");
+  hint.style.cssText = "position:fixed;left:50%;top:1rem;transform:translateX(-50%);z-index:10;" +
+    "max-width:42rem;padding:.9rem 1.2rem;border-left:4px solid #9e0d0a;background:#14100f;" +
+    "color:#f4f4f5;font:15px/1.5 system-ui,sans-serif;box-shadow:0 4px 24px #000a";
+  hint.textContent = "Die Grafikbeschleunigung deines Browsers ist ausgeschaltet (" + renderer +
+    "). Das Spiel läuft dadurch extrem langsam. Einschalten: Browser-Einstellungen → System → " +
+    "„Grafikbeschleunigung verwenden, wenn verfügbar“, danach den Browser neu starten.";
+  document.body.append(hint);
+}
+
+warnIfSoftwareRendering();
+
 try {
   await init({ module_or_path: "./pkg/totenrunde_bg.wasm" });
   loading.hidden = true;
