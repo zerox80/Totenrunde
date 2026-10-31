@@ -4,7 +4,7 @@ Ein rundenbasierter Zombie-Shooter im Stil von *Black Ops 2*, geschrieben in **R
 **Bevy 0.20**. Die Karte „Endstation“ ist ein verlassener Busbahnhof bei Nacht.
 
 Das Spiel gibt es für **Windows**, **Linux** und den **Browser**. Der Browser-Port verwendet
-WebAssembly und WebGL 2. Der Webserver liefert es per **HTTP/3 über QUIC/UDP** aus; der erste
+WebAssembly und **WebGPU**, in älteren Browsern WebGL 2. Der Webserver liefert es per **HTTP/3 über QUIC/UDP** aus; der erste
 Aufruf läuft über HTTPS/TCP, das den Browser auf HTTP/3 umleitet.
 
 **Aktuell ist das Spiel Solo; Online-Multiplayer ist nicht enthalten.**
@@ -61,8 +61,9 @@ Bestätigung. Anschließend ist das Spiel unter folgender Adresse erreichbar:
 https://DEINE_DOMAIN
 ```
 
-Einen aktuellen Desktop-Browser mit WebAssembly, WebGL 2 und aktivierter
-Hardware-Beschleunigung verwenden.
+Einen aktuellen Desktop-Browser mit WebAssembly, WebGPU oder WebGL 2 und aktivierter
+Hardware-Beschleunigung verwenden. Ist sie ausgeschaltet, rendert der Browser auf der CPU; die
+Seite weist dann darauf hin.
 
 Bei einem abweichenden SSH-Port diesen angeben, damit die Firewall ihn offen lässt:
 
@@ -132,7 +133,8 @@ Axum-Server
   |-- Spiel-Assets
   `-- /api/health
 
-Das Spiel wird im Browser ausgeführt und rendert über WebGL 2 auf der GPU des Spielers.
+Das Spiel wird im Browser ausgeführt und rendert über WebGPU (sonst WebGL 2) auf der GPU des
+Spielers.
 ```
 
 Der Server stellt also das Spiel bereit; er berechnet nicht die 3D-Grafik für die Spieler.

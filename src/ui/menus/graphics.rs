@@ -109,14 +109,16 @@ fn value(o: Opt, s: &Settings) -> String {
         Opt::Msaa => match s.msaa {
             0 => "AUS".into(),
             1 => "FXAA".into(),
-            2 => "MSAA 2×".into(),
+            2 if !cfg!(feature = "webgpu") => "MSAA 2×".into(),
             _ => "MSAA 4×".into(),
         },
         Opt::Shadows => onoff(s.shadows),
         Opt::Bloom => onoff(s.bloom),
         Opt::Film => onoff(s.film),
         Opt::AutoExposure => {
-            if cfg!(target_arch = "wasm32") {
+            if cfg!(feature = "webgpu") {
+                "NICHT IM BROWSER".into()
+            } else if cfg!(target_arch = "wasm32") {
                 "NICHT IN WEBGL2".into()
             } else {
                 onoff(s.auto_exposure)
@@ -254,6 +256,8 @@ fn on_click(
         Opt::Msaa => {
             s.msaa = match s.msaa {
                 0 => 1,
+                // WebGPU kennt kein MSAA 2×
+                1 if cfg!(feature = "webgpu") => 4,
                 1 => 2,
                 2 => 4,
                 _ => 0,

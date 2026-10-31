@@ -7,10 +7,16 @@ RUN sh /tmp/install-binaryen.sh \
 COPY Cargo.toml Cargo.lock build.rs ./
 COPY src ./src
 COPY assets/maps/endstation.json ./assets/maps/endstation.json
+# Zwei Builds: WebGPU für moderne Browser, WebGL2 als Rückfall; main.js wählt beim Laden.
 RUN cargo build --release --locked --target wasm32-unknown-unknown --bin totenrunde \
     && wasm-bindgen --target web --out-name totenrunde \
         --out-dir /web/pkg target/wasm32-unknown-unknown/release/totenrunde.wasm \
     && wasm-opt -Oz /web/pkg/totenrunde_bg.wasm -o /web/pkg/totenrunde_bg.wasm
+RUN cargo build --release --locked --target wasm32-unknown-unknown --bin totenrunde \
+        --no-default-features --features webgpu --target-dir target/webgpu \
+    && wasm-bindgen --target web --out-name totenrunde_webgpu \
+        --out-dir /web/pkg target/webgpu/wasm32-unknown-unknown/release/totenrunde.wasm \
+    && wasm-opt -Oz /web/pkg/totenrunde_webgpu_bg.wasm -o /web/pkg/totenrunde_webgpu_bg.wasm
 
 FROM rust:1.97-bookworm AS backend-builder
 WORKDIR /build/backend

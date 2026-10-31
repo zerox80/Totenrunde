@@ -1,5 +1,3 @@
-import init from "./pkg/totenrunde.js";
-
 const loading = document.getElementById("loading");
 const error = document.getElementById("error");
 const errorMessage = document.getElementById("error-message");
@@ -27,10 +25,52 @@ function warnIfSoftwareRendering() {
   document.body.append(hint);
 }
 
+// WebGPU, wenn der Browser einen echten Grafikadapter dafür liefert, sonst WebGL2.
+// Zum Testen erzwingen: ?renderer=webgl2 bzw. ?renderer=webgpu
+async function chooseRenderer() {
+  const forced = new URLSearchParams(location.search).get("renderer");
+  if (forced === "webgl2" || forced === "webgpu") {
+    return forced;
+  }
+  if (!navigator.gpu) {
+    return "webgl2";
+  }
+  try {
+    const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+    const software = adapter?.info?.isFallbackAdapter ?? adapter?.isFallbackAdapter;
+    return adapter && !software ? "webgpu" : "webgl2";
+  } catch {
+    return "webgl2";
+  }
+}
+
+// Scheitert WebGPU trotzdem beim Start (Absturz im Spielcode), mit WebGL2 neu laden.
+// Nur Fehler aus dem Spiel zählen, nicht die von Browser-Erweiterungen.
+function fallBackToWebGl2OnCrash() {
+  const crashed = (event) => {
+    const fromGame = event.error instanceof WebAssembly.RuntimeError
+      || (event.filename ?? "").includes("/pkg/");
+    if (fromGame) {
+      const url = new URL(location.href);
+      url.searchParams.set("renderer", "webgl2");
+      location.replace(url);
+    }
+  };
+  window.addEventListener("error", crashed);
+  setTimeout(() => window.removeEventListener("error", crashed), 30000);
+}
+
 warnIfSoftwareRendering();
 
 try {
-  await init({ module_or_path: "./pkg/totenrunde_bg.wasm" });
+  const renderer = await chooseRenderer();
+  console.info("Grafikschnittstelle:", renderer);
+  if (renderer === "webgpu" && !new URLSearchParams(location.search).has("renderer")) {
+    fallBackToWebGl2OnCrash();
+  }
+  const name = renderer === "webgpu" ? "totenrunde_webgpu" : "totenrunde";
+  const { default: init } = await import(`./pkg/${name}.js`);
+  await init({ module_or_path: `./pkg/${name}_bg.wasm` });
   loading.hidden = true;
   canvas.focus();
 } catch (cause) {

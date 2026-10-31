@@ -70,7 +70,8 @@ pub fn spawn_player(
 fn msaa(s: &Settings) -> Msaa {
     match s.msaa {
         0 | 1 => Msaa::Off,
-        2 => Msaa::Sample2,
+        // WebGPU kennt nur 1 oder 4 Abtastungen
+        2 if !cfg!(feature = "webgpu") => Msaa::Sample2,
         _ => Msaa::Sample4,
     }
 }

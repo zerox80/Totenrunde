@@ -24,7 +24,7 @@ python3 install.py --non-interactive \
   --domain spiel.example.de --email admin@example.de
 ```
 
-Anschließend läuft das Spiel unter `https://spiel.example.de` beziehungsweise `https://spiel.example.de:PORT`. Ein aktueller Desktop-Browser mit WebAssembly und WebGL 2 wird benötigt.
+Anschließend läuft das Spiel unter `https://spiel.example.de` beziehungsweise `https://spiel.example.de:PORT`. Ein aktueller Desktop-Browser mit WebAssembly und WebGPU oder WebGL 2 wird benötigt.
 
 ## Docker Compose selbst bauen
 
@@ -69,6 +69,8 @@ Der Spieledienst selbst öffnet niemals TCP/80. Certbot Standalone verwendet die
 
 Vorausgesetzt werden Rust, OpenSSL, das Wasm-Ziel, `wasm-bindgen-cli` in exakt der zur Root-Crate passenden Version und `wasm-opt` aus Binaryen. Nicht das Paket aus Debian bookworm verwenden: Dessen Version 108 lenkt den Tabellen-Export von wasm-bindgen um, im Browser erscheint dann `WebAssembly.Table.grow(): failed to grow table`. `sudo sh backend/install-binaryen.sh` installiert die auch von Docker und CI genutzte geprüfte Version. Vom Projektroot aus:
 
+Es entstehen zwei Builds: WebGL2 (`totenrunde`) und WebGPU (`totenrunde_webgpu`, Feature `webgpu`). Bevy kann nicht beides in einem Build. `backend/web/main.js` nimmt WebGPU, wenn der Browser dafür einen echten Grafikadapter liefert, sonst WebGL2; stürzt WebGPU beim Start ab, lädt die Seite mit WebGL2 neu. Mit `?renderer=webgl2` oder `?renderer=webgpu` lässt sich die Wahl erzwingen.
+
 ```sh
 rustup target add wasm32-unknown-unknown
 cargo install wasm-bindgen-cli --version 0.2.129 --locked
@@ -79,6 +81,14 @@ wasm-bindgen --target web --out-name totenrunde \
 wasm-opt -Oz backend/web/pkg/totenrunde_bg.wasm \
   -o backend/web/pkg/totenrunde_bg.wasm
 python3 backend/check-wasm.py backend/web/pkg/totenrunde_bg.wasm
+CARGO_BUILD_JOBS=1 cargo build --release --locked --target wasm32-unknown-unknown --bin totenrunde \
+  --no-default-features --features webgpu --target-dir target/webgpu
+wasm-bindgen --target web --out-name totenrunde_webgpu \
+  --out-dir backend/web/pkg \
+  target/webgpu/wasm32-unknown-unknown/release/totenrunde.wasm
+wasm-opt -Oz backend/web/pkg/totenrunde_webgpu_bg.wasm \
+  -o backend/web/pkg/totenrunde_webgpu_bg.wasm
+python3 backend/check-wasm.py backend/web/pkg/totenrunde_webgpu_bg.wasm
 TLS_CERT_PATH="$PWD/backend/certs/fullchain.pem" \
 TLS_KEY_PATH="$PWD/backend/certs/privkey.pem" \
 TLS_SERVER_NAME=localhost PORT=8443 \
@@ -111,9 +121,9 @@ Optional kann beim DNS-Anbieter zusätzlich ein HTTPS/SVCB-Eintrag mit `alpn="h3
 
 ## Grafik und GPU
 
-WebGL 2 rendert auf der GPU, sofern der Browser die Hardware-Beschleunigung nicht deaktiviert hat oder auf Software-Rendering zurückfällt. Beim ersten Start dienen die gemeldeten CPU-Kerne als grobe Starthilfe: bis 4 Niedrig, bis 8 Mittel, darüber Hoch; ohne Angabe Mittel. Gespeicherte Einstellungen werden nie automatisch überschrieben.
+WebGPU und WebGL 2 rendern auf der GPU, sofern der Browser die Hardware-Beschleunigung nicht deaktiviert hat oder auf Software-Rendering zurückfällt. WebGPU kennt nur MSAA 1× oder 4×; das Grafikmenü überspringt dort 2×. Beim ersten Start dienen die gemeldeten CPU-Kerne als grobe Starthilfe: bis 4 Niedrig, bis 8 Mittel, darüber Hoch; ohne Angabe Mittel. Gespeicherte Einstellungen werden nie automatisch überschrieben.
 
-Die Presets wählen 50 % (Niedrig), 75 % (Mittel) oder 100 % (Hoch/Extrem) Renderauflösung. Im Grafikmenü sind diese drei Werte auch einzeln einstellbar. Die Anzeige bleibt bildschirmfüllend; ein kleinerer Renderpuffer reduziert vor allem die GPU-Last. Texturänderungen greifen nach einem Neustart. Auto Exposure bleibt unter WebGL2 deaktiviert, da dafür Compute-Shader erforderlich sind. Mit **F3** lässt sich die FPS-Anzeige einblenden.
+Die Presets wählen 50 % (Niedrig), 75 % (Mittel) oder 100 % (Hoch/Extrem) Renderauflösung. Im Grafikmenü sind diese drei Werte auch einzeln einstellbar. Die Anzeige bleibt bildschirmfüllend; ein kleinerer Renderpuffer reduziert vor allem die GPU-Last. Texturänderungen greifen nach einem Neustart. Auto Exposure bleibt im Browser vorerst deaktiviert (unter WebGL2 fehlen die nötigen Compute-Shader). Mit **F3** lässt sich die FPS-Anzeige einblenden.
 
 ## Tests
 

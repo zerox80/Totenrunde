@@ -45,6 +45,8 @@ jobs:
         run: |
           cargo clippy --locked --bin totenrunde
           cargo clippy --locked --target wasm32-unknown-unknown --bin totenrunde
+          cargo clippy --locked --target wasm32-unknown-unknown --bin totenrunde \
+            --no-default-features --features webgpu --target-dir target/webgpu
       - name: Installer und Deployment prüfen
         run: |
           python3 -m py_compile backend/install.py backend/check-wasm.py
