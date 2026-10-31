@@ -27,6 +27,7 @@ mod weapons;
 mod world;
 mod zombies;
 
+use bevy::asset::AssetMetaCheck;
 use bevy::prelude::*;
 use bevy::window::{PresentMode, WindowResolution};
 
@@ -57,6 +58,12 @@ fn main() {
         DefaultPlugins
             .set(WindowPlugin {
                 primary_window: Some(window),
+                ..default()
+            })
+            // Es gibt keine .meta-Dateien; ohne das fragt Bevy zu jedem Asset erst danach
+            // (im Browser je eine 404-Anfrage, die vor dem eigentlichen Download abgewartet wird)
+            .set(AssetPlugin {
+                meta_check: AssetMetaCheck::Never,
                 ..default()
             })
             .set(ImagePlugin::default_linear()),
