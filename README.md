@@ -4,7 +4,8 @@ Ein rundenbasierter Zombie-Shooter im Stil von *Black Ops 2*, geschrieben in **R
 **Bevy 0.20**. Die Karte „Endstation“ ist ein verlassener Busbahnhof bei Nacht.
 
 Das Spiel gibt es für **Windows**, **Linux** und den **Browser**. Der Browser-Port verwendet
-WebAssembly und WebGL 2. Der Webserver spricht ausschließlich **HTTP/3 über QUIC/UDP**.
+WebAssembly und WebGL 2. Der Webserver liefert es per **HTTP/3 über QUIC/UDP** aus; der erste
+Aufruf läuft über HTTPS/TCP, das den Browser auf HTTP/3 umleitet.
 
 **Aktuell ist das Spiel Solo; Online-Multiplayer ist nicht enthalten.**
 
@@ -28,7 +29,7 @@ Desktop-Version wird er nicht benötigt.
 - Ubuntu 24.04+ oder Rocky Linux 10+
 - eine Domain wie `spiel.example.de`, deren DNS auf den Server zeigt
 - ein sudo-/root-Zugang
-- `TCP/80` für das Let’s-Encrypt-Zertifikat und `UDP/443` für HTTP/3 freigegeben
+- `TCP/80` für das Let’s-Encrypt-Zertifikat sowie `TCP/443` und `UDP/443` für das Spiel freigegeben
 
 Der Installer richtet Docker, Compose, Certbot, UFW/firewalld und das fertige Container-Image
 automatisch ein. Rust und Blender werden dafür nicht benötigt.
@@ -60,7 +61,7 @@ Bestätigung. Anschließend ist das Spiel unter folgender Adresse erreichbar:
 https://DEINE_DOMAIN
 ```
 
-Einen aktuellen Desktop-Browser mit HTTP/3, WebAssembly, WebGL 2 und aktivierter
+Einen aktuellen Desktop-Browser mit WebAssembly, WebGL 2 und aktivierter
 Hardware-Beschleunigung verwenden.
 
 Bei einem abweichenden SSH-Port diesen angeben, damit die Firewall ihn offen lässt:
@@ -121,9 +122,10 @@ Systemen sind höhere Qualität und 100 % Auflösung verfügbar. Browser-Einstel
 
 ```text
 Browser
-  | HTTP/3 über QUIC/UDP und TLS
+  | 1. HTTPS über TCP (HTTP/1.1 oder HTTP/2) -> Antwort mit Alt-Svc: h3
+  | 2. danach HTTP/3 über QUIC/UDP
   v
-Quinn + h3
+hyper + rustls (TCP) / Quinn + h3 (UDP)
   v
 Axum-Server
   |-- Wasm und JavaScript
@@ -135,7 +137,7 @@ Das Spiel wird im Browser ausgeführt und rendert über WebGL 2 auf der GPU des 
 
 Der Server stellt also das Spiel bereit; er berechnet nicht die 3D-Grafik für die Spieler.
 Certbot verwaltet das TLS-Zertifikat auf dem Host. Docker startet den Server als
-unprivilegierter Benutzer. Nginx sowie HTTP/1.1- und HTTP/2-Fallbacks werden nicht verwendet.
+unprivilegierter Benutzer. Nginx wird nicht benötigt.
 
 ## Projektaufbau
 
@@ -150,7 +152,9 @@ src/                 Rust-/Bevy-Spielcode
   ui/                HUD und Menüs
 assets/              Fertige Modelle, Texturen, Sounds und Karten
 backend/
-  src/http3.rs       HTTP/3-Server und Healthcheck
+  src/http3.rs       HTTP/3-Server über QUIC
+  src/tcp.rs         HTTPS-Einstieg über TCP mit Alt-Svc
+  src/tls.rs         Zertifikate laden
   src/main.rs        Axum-Routen und Dateiauslieferung
   web/               Browser-Einstieg
   install.py         Geführter Server-Installer

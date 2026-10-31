@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Geführte Installation von Totenrunde-Web mit Docker, Certbot und HTTP/3."""
+"""Geführte Installation von Totenrunde-Web mit Docker, Certbot, HTTPS und HTTP/3."""
 
 import argparse
 import os
@@ -73,12 +73,14 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
         description=(
             "Richtet Totenrunde-Web auf Ubuntu 24.04+ oder Rocky Linux 10+ "
-            "mit einem echten TLS-Zertifikat und ausschließlich HTTP/3 ein."
+            "mit einem echten TLS-Zertifikat, HTTPS über TCP und HTTP/3 über UDP ein."
         )
     )
     parser.add_argument("--domain", help="Öffentlicher DNS-Name, z. B. spiel.example.de")
     parser.add_argument("--email", help="E-Mail-Adresse für Let's-Encrypt-Hinweise")
-    parser.add_argument("--port", type=int, help="Öffentlicher UDP-Port (Standard: 443)")
+    parser.add_argument(
+        "--port", type=int, help="Öffentlicher Port für TCP und UDP (Standard: 443)"
+    )
     parser.add_argument(
         "--ssh-port",
         type=int,
@@ -262,6 +264,7 @@ def configure_firewall(installer, system, port, ssh_port):
     if system == "ubuntu":
         installer.run(["ufw", "allow", f"{ssh_port}/tcp", "comment", "SSH"])
         installer.run(["ufw", "allow", "80/tcp", "comment", "Certbot"])
+        installer.run(["ufw", "allow", f"{port}/tcp", "comment", "Totenrunde HTTPS"])
         installer.run(["ufw", "allow", f"{port}/udp", "comment", "Totenrunde HTTP3"])
         installer.run(["ufw", "--force", "enable"])
         installer.run(["ufw", "status", "verbose"])
@@ -269,11 +272,12 @@ def configure_firewall(installer, system, port, ssh_port):
         installer.run(["systemctl", "enable", "--now", "firewalld"])
         installer.run(["firewall-cmd", "--permanent", f"--add-port={ssh_port}/tcp"])
         installer.run(["firewall-cmd", "--permanent", "--add-port=80/tcp"])
+        installer.run(["firewall-cmd", "--permanent", f"--add-port={port}/tcp"])
         installer.run(["firewall-cmd", "--permanent", f"--add-port={port}/udp"])
         installer.run(["firewall-cmd", "--reload"])
     print(
         "Router und Cloud-Firewall müssen zusätzlich TCP/80 sowie "
-        f"UDP/{port} zu diesem Server weiterleiten."
+        f"TCP/{port} und UDP/{port} zu diesem Server weiterleiten."
     )
 
 
@@ -381,7 +385,7 @@ def start_and_verify(installer):
             )
             status = result.stdout.strip()
             if status == "healthy":
-                print("Der HTTP/3-Healthcheck ist erfolgreich.")
+                print("Der Healthcheck über HTTP/3 und HTTPS/TCP ist erfolgreich.")
                 return
             if status == "unhealthy":
                 break
@@ -398,7 +402,7 @@ def main():
         print(
             "\nTotenrunde-Einrichtung:\n"
             f"  Adresse: https://{settings['domain']}:{settings['port']}\n"
-            "  Protokoll: ausschließlich HTTP/3 (QUIC/UDP)\n"
+            "  Protokoll: HTTP/3 (QUIC/UDP), Einstieg über HTTPS/TCP mit Alt-Svc\n"
             "  Zertifikat: Let's Encrypt über Certbot\n"
         )
         if not args.dry_run and not args.non_interactive:
@@ -420,7 +424,7 @@ def main():
         start_and_verify(installer)
         print(
             f"\nFertig: https://{settings['domain']}:{settings['port']}\n"
-            "Einen aktuellen Desktop-Browser mit HTTP/3- und WebGL-2-Unterstützung verwenden."
+            "Einen aktuellen Desktop-Browser mit WebGL-2-Unterstützung verwenden."
         )
         return 0
     except (SetupError, subprocess.CalledProcessError, OSError, ValueError) as error:

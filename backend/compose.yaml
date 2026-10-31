@@ -5,8 +5,10 @@ services:
       dockerfile: backend/Dockerfile
     image: ${IMAGE:-ghcr.io/zerox80/totenrunde-web}:${TAG:-latest}
     ports:
+      - "${PORT:-8443}:8443/tcp"
       - "${PORT:-8443}:8443/udp"
     environment:
+      PUBLIC_PORT: ${PORT:-8443}
       TLS_SERVER_NAME: ${TLS_SERVER_NAME:-localhost}
       TLS_CERT_PATH: /certs/fullchain.pem
       TLS_KEY_PATH: /certs/privkey.pem

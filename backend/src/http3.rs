@@ -1,9 +1,6 @@
 use std::{
-    fs::File,
     future::Future,
-    io::BufReader,
     net::{IpAddr, Ipv6Addr, SocketAddr},
-    path::Path,
     sync::Arc,
 };
 
@@ -14,45 +11,22 @@ use http_body_util::BodyExt;
 use quinn::{
     ClientConfig, Endpoint,
     crypto::rustls::{QuicClientConfig, QuicServerConfig},
-    rustls::{
-        self,
-        pki_types::{CertificateDer, PrivateKeyDer},
-    },
+    rustls::{self, pki_types::CertificateDer},
 };
 use tower::ServiceExt;
 
-const MAX_BODY_SIZE: usize = 1024 * 1024;
-type DynError = Box<dyn std::error::Error + Send + Sync>;
+use crate::{DynError, MAX_BODY_SIZE, tls};
 
-pub async fn serve(
+pub fn server_endpoint(
     address: SocketAddr,
-    app: Router,
-    cert_path: &Path,
-    key_path: &Path,
-) -> Result<(), DynError> {
-    let certificates = load_certificates(cert_path)?;
-    let key = load_private_key(key_path)?;
-    let endpoint = server_endpoint(address, certificates, key)?;
-    println!(
-        "Totenrunde-Web lauscht ausschließlich per HTTP/3 auf https://{address} (UDP, ALPN h3)"
-    );
-    run_server(endpoint, app, shutdown_signal()).await
-}
-
-fn server_endpoint(
-    address: SocketAddr,
-    certificates: Vec<CertificateDer<'static>>,
-    key: PrivateKeyDer<'static>,
+    mut tls: rustls::ServerConfig,
 ) -> Result<Endpoint, DynError> {
-    let mut tls = rustls::ServerConfig::builder()
-        .with_no_client_auth()
-        .with_single_cert(certificates, key)?;
     tls.alpn_protocols = vec![b"h3".to_vec()];
     let config = quinn::ServerConfig::with_crypto(Arc::new(QuicServerConfig::try_from(tls)?));
     Ok(Endpoint::server(config, address)?)
 }
 
-async fn run_server(
+pub async fn run_server(
     endpoint: Endpoint,
     app: Router,
     shutdown: impl Future<Output = ()> + Send,
@@ -158,44 +132,13 @@ where
     Ok((body.freeze(), too_large))
 }
 
-pub async fn healthcheck(
-    address: SocketAddr,
-    cert_path: &Path,
-    server_name: &str,
-) -> Result<(), DynError> {
-    let certificates = load_certificates(cert_path)?;
-    let (status, _, body) = request_once(
-        address,
-        server_name,
-        certificates,
-        &format!("https://{server_name}/api/health"),
-    )
-    .await?;
-    if status != StatusCode::OK {
-        return Err(format!("Healthcheck lieferte HTTP {status}").into());
-    }
-    let health: serde_json::Value = serde_json::from_slice(&body)?;
-    if health["status"] != "ok" {
-        return Err("Healthcheck meldet keinen fehlerfreien Zustand".into());
-    }
-    println!("HTTP/3-Healthcheck erfolgreich: {health}");
-    Ok(())
-}
-
-async fn request_once(
+pub async fn request_once(
     address: SocketAddr,
     server_name: &str,
     certificates: Vec<CertificateDer<'static>>,
-    uri: &str,
+    path: &str,
 ) -> Result<(StatusCode, axum::http::HeaderMap, Bytes), DynError> {
-    let mut roots = rustls::RootCertStore::empty();
-    for certificate in certificates {
-        roots.add(certificate)?;
-    }
-    let mut tls = rustls::ClientConfig::builder()
-        .with_root_certificates(roots)
-        .with_no_client_auth();
-    tls.alpn_protocols = vec![b"h3".to_vec()];
+    let tls = tls::client_config(certificates, b"h3")?;
     let config = ClientConfig::new(Arc::new(QuicClientConfig::try_from(tls)?));
 
     let bind_address = if address.is_ipv4() {
@@ -212,7 +155,8 @@ async fn request_once(
             async move { std::future::poll_fn(|context| driver.poll_close(context)).await },
         );
 
-    let result = receive_client_response(&mut sender, uri).await;
+    let uri = format!("https://{server_name}{path}");
+    let result = receive_client_response(&mut sender, &uri).await;
     drop(sender);
     endpoint.close(0u32.into(), b"request complete");
     let _ = driver_task.await;
@@ -238,56 +182,6 @@ async fn receive_client_response(
     Ok((response.status(), response.headers().clone(), body.freeze()))
 }
 
-fn load_certificates(path: &Path) -> Result<Vec<CertificateDer<'static>>, DynError> {
-    let file = File::open(path).map_err(|error| {
-        format!(
-            "TLS-Zertifikat {} konnte nicht geöffnet werden: {error}",
-            path.display()
-        )
-    })?;
-    let certificates =
-        rustls_pemfile::certs(&mut BufReader::new(file)).collect::<Result<Vec<_>, _>>()?;
-    if certificates.is_empty() {
-        return Err(format!("TLS-Zertifikat {} ist leer", path.display()).into());
-    }
-    Ok(certificates)
-}
-
-fn load_private_key(path: &Path) -> Result<PrivateKeyDer<'static>, DynError> {
-    let file = File::open(path).map_err(|error| {
-        format!(
-            "TLS-Schlüssel {} konnte nicht geöffnet werden: {error}",
-            path.display()
-        )
-    })?;
-    rustls_pemfile::private_key(&mut BufReader::new(file))?
-        .ok_or_else(|| format!("TLS-Schlüssel {} ist leer oder ungültig", path.display()).into())
-}
-
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Strg+C-Handler konnte nicht installiert werden");
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("SIGTERM-Handler konnte nicht installiert werden")
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        () = ctrl_c => {},
-        () = terminate => {},
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::{
@@ -303,7 +197,7 @@ mod tests {
     use tokio::sync::oneshot;
 
     use super::{request_once, run_server, server_endpoint};
-    use crate::router;
+    use crate::{router, tls};
 
     static NEXT_TEMP_DIR: AtomicU64 = AtomicU64::new(0);
 
@@ -347,8 +241,7 @@ mod tests {
             PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(certified.key_pair.serialize_der()));
         let endpoint = server_endpoint(
             SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 0)),
-            vec![certificate.clone()],
-            key,
+            tls::server_config(vec![certificate.clone()], key).unwrap(),
         )
         .unwrap();
         let address = endpoint.local_addr().unwrap();
@@ -365,7 +258,7 @@ mod tests {
             address,
             "localhost",
             vec![certificate.clone()],
-            "https://localhost/api/health",
+            "/api/health",
         )
         .await
         .unwrap();
@@ -375,14 +268,10 @@ mod tests {
             "ok"
         );
 
-        let (status, headers, body) = request_once(
-            address,
-            "localhost",
-            vec![certificate],
-            "https://localhost/game.wasm",
-        )
-        .await
-        .unwrap();
+        let (status, headers, body) =
+            request_once(address, "localhost", vec![certificate], "/game.wasm")
+                .await
+                .unwrap();
         assert_eq!(status, StatusCode::OK);
         assert_eq!(headers[header::CONTENT_TYPE], "application/wasm");
         assert_eq!(body.as_ref(), b"\0asm\x01\0\0\0");

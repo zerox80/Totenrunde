@@ -35,7 +35,7 @@ USER app
 ENV HOST=0.0.0.0 PORT=8443 WEB_ROOT=/app/web ASSET_ROOT=/app/assets \
     TLS_CERT_PATH=/certs/fullchain.pem TLS_KEY_PATH=/certs/privkey.pem \
     TLS_SERVER_NAME=localhost
-EXPOSE 8443/udp
+EXPOSE 8443/tcp 8443/udp
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD ["/app/totenrunde-web", "--healthcheck"]
 ENTRYPOINT ["/app/totenrunde-web"]

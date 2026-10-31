@@ -1,6 +1,8 @@
 # Totenrunde-Web
 
-Der Server stellt die Bevy-Wasm-Anwendung, die Spiel-Assets und `GET /api/health` ausschließlich über **HTTP/3** bereit. `h3` und `h3-quinn`/`quinn` übernehmen QUIC und TLS; der vorhandene Axum-Router kümmert sich weiterhin um Routen, MIME-Typen, Kompression und Header. Es gibt weder Nginx noch einen HTTP/1.1-, HTTP/2-, TCP- oder Klartext-Fallback.
+Der Server stellt die Bevy-Wasm-Anwendung, die Spiel-Assets und `GET /api/health` über **HTTP/3** bereit. `h3` und `h3-quinn`/`quinn` übernehmen QUIC und TLS; der vorhandene Axum-Router kümmert sich weiterhin um Routen, MIME-Typen, Kompression und Header.
+
+Auf demselben Port lauscht zusätzlich ein HTTPS-Zugang über TCP (HTTP/1.1 und HTTP/2, `hyper` und `tokio-rustls`). Browser verbinden sich zu einer unbekannten Seite immer zuerst per TCP; jede Antwort enthält `Alt-Svc: h3=":PORT"`, worauf der Browser für die folgenden Anfragen auf HTTP/3 wechselt. Ohne diesen Einstieg wäre der reine QUIC-Server im Browser nicht erreichbar. Ein Klartext-Zugang (HTTP auf Port 80) existiert nicht.
 
 ## Einfachste Installation ohne Vorkenntnisse
 
@@ -11,9 +13,9 @@ cd ~/Dokumente/Projekte/Totenstille-compose
 python3 install.py
 ```
 
-Der Installer fragt Domain und Let's-Encrypt-E-Mail ab und richtet Docker, Compose, Certbot, Firewall, TLS, automatische Zertifikatserneuerung und den Container ein. Er benötigt dafür `sudo`/root. Vorher muss der öffentliche DNS-Eintrag der Domain auf den Server zeigen. Router und Cloud-Firewall müssen `TCP/80` für die ACME-Prüfung sowie den gewählten Port per UDP (standardmäßig `443/udp`) freigeben.
+Der Installer fragt Domain und Let's-Encrypt-E-Mail ab und richtet Docker, Compose, Certbot, Firewall, TLS, automatische Zertifikatserneuerung und den Container ein. Er benötigt dafür `sudo`/root. Vorher muss der öffentliche DNS-Eintrag der Domain auf den Server zeigen. Router und Cloud-Firewall müssen `TCP/80` für die ACME-Prüfung sowie den gewählten Port per TCP und UDP (standardmäßig `443/tcp` und `443/udp`) freigeben.
 
-Ubuntu verwendet UFW, Rocky firewalld. SSH (`22/tcp`), Certbot (`80/tcp`) und das Spiel (`443/udp`) werden automatisch erlaubt; bei einem anderen SSH-Port unbedingt `--ssh-port PORT` angeben. Ein nicht interaktiver Lauf und ein gefahrloser Dry-Run sind ebenfalls möglich:
+Ubuntu verwendet UFW, Rocky firewalld. SSH (`22/tcp`), Certbot (`80/tcp`) und das Spiel (`443/tcp` und `443/udp`) werden automatisch erlaubt; bei einem anderen SSH-Port unbedingt `--ssh-port PORT` angeben. Ein nicht interaktiver Lauf und ein gefahrloser Dry-Run sind ebenfalls möglich:
 
 ```sh
 python3 install.py --dry-run --non-interactive \
@@ -22,7 +24,7 @@ python3 install.py --non-interactive \
   --domain spiel.example.de --email admin@example.de
 ```
 
-Anschließend läuft das Spiel unter `https://spiel.example.de` beziehungsweise `https://spiel.example.de:PORT`. Ein aktueller Desktop-Browser mit HTTP/3, WebAssembly und WebGL 2 wird benötigt.
+Anschließend läuft das Spiel unter `https://spiel.example.de` beziehungsweise `https://spiel.example.de:PORT`. Ein aktueller Desktop-Browser mit WebAssembly und WebGL 2 wird benötigt.
 
 ## Docker Compose selbst bauen
 
@@ -42,7 +44,7 @@ docker compose -f backend/compose.yaml ps
 docker compose -f backend/compose.yaml logs -f web
 ```
 
-Der Healthcheck im Image ist selbst ein Quinn/H3-Client und prüft `https://TLS_SERVER_NAME:8443/api/health` mit SNI und Zertifikatsvalidierung. Selbstsignierte Zertifikate eignen sich für automatisierte Tests, aber nicht zuverlässig für Browser-HTTP/3; für den Browsertest ein echtes Domain-Zertifikat verwenden. Zum Stoppen:
+Der Healthcheck im Image prüft `https://TLS_SERVER_NAME:8443/api/health` nacheinander als Quinn/H3-Client und über HTTPS/TCP, jeweils mit SNI und Zertifikatsvalidierung. Selbstsignierte Zertifikate eignen sich für automatisierte Tests, aber nicht zuverlässig für Browser-HTTP/3; für den Browsertest ein echtes Domain-Zertifikat verwenden. Zum Stoppen:
 
 ```sh
 docker compose -f backend/compose.yaml down
@@ -94,8 +96,9 @@ cargo run --release --locked --manifest-path backend/Cargo.toml -- --healthcheck
 
 ## Konfiguration
 
-- `HOST`: UDP-Adresse, an die Quinn gebunden wird (Standard: `127.0.0.1`, im Container `0.0.0.0`)
-- `PORT`: UDP-Port (Standard: `8443`)
+- `HOST`: Adresse, an die der UDP- und der TCP-Zugang gebunden werden (Standard: `127.0.0.1`, im Container `0.0.0.0`)
+- `PORT`: Port für UDP und TCP (Standard: `8443`)
+- `PUBLIC_PORT`: von außen erreichbarer Port, der im `Alt-Svc`-Header angekündigt wird (Standard: `PORT`; Compose setzt ihn auf den veröffentlichten Port)
 - `TLS_CERT_PATH`: PEM-Zertifikatskette (Standard: `/certs/fullchain.pem`)
 - `TLS_KEY_PATH`: privater PEM-Schlüssel (Standard: `/certs/privkey.pem`)
 - `TLS_SERVER_NAME`: DNS-Name für SNI und Zertifikatsprüfung im Healthcheck
@@ -103,7 +106,7 @@ cargo run --release --locked --manifest-path backend/Cargo.toml -- --healthcheck
 - `ASSET_ROOT`: Verzeichnis mit den unter `/assets` veröffentlichten Spiel-Assets
 - Compose zusätzlich: `CERT_DIR`, `IMAGE`, `TAG`, `DOMAIN` und `CERTBOT_EMAIL`
 
-Für eine zuverlässige erste HTTP/3-Verbindung ohne früheren Alt-Svc-Eintrag kann beim DNS-Anbieter zusätzlich ein HTTPS/SVCB-Eintrag mit `alpn="h3"` gesetzt werden. Der Server bietet bewusst keine Möglichkeit, auf HTTP/1.1 oder HTTP/2 auszuweichen.
+Optional kann beim DNS-Anbieter zusätzlich ein HTTPS/SVCB-Eintrag mit `alpn="h3"` gesetzt werden; Browser, die ihn auswerten, nutzen HTTP/3 dann schon ab der ersten Anfrage.
 
 ## Grafik und GPU
 
@@ -121,4 +124,4 @@ python3 backend/install.py --dry-run --non-interactive \
   --domain spiel.example.de --email admin@example.de
 ```
 
-Die Tests enthalten eine echte QUIC/HTTP/3-Verbindung mit temporärem `rcgen`-Zertifikat und prüfen Health-API sowie statische Wasm-Auslieferung. Unbekannte `/api/*`-Routen liefern JSON mit Status 404. HTML wird ohne Cache ausgeliefert; versionierte Dateien können langfristig zwischengespeichert werden. Gzip- und Brotli-Kompression sind aktiv. Es werden bewusst keine COOP-/COEP-Header gesetzt, damit der single-threaded Wasm-Port keine Cross-Origin-Isolation benötigt.
+Die Tests enthalten echte QUIC/HTTP/3- und HTTPS/TCP-Verbindungen mit temporärem `rcgen`-Zertifikat und prüfen Health-API, statische Wasm-Auslieferung und den `Alt-Svc`-Header. Unbekannte `/api/*`-Routen liefern JSON mit Status 404. HTML wird ohne Cache ausgeliefert; versionierte Dateien können langfristig zwischengespeichert werden. Gzip- und Brotli-Kompression sind aktiv. Es werden bewusst keine COOP-/COEP-Header gesetzt, damit der single-threaded Wasm-Port keine Cross-Origin-Isolation benötigt.

@@ -1,4 +1,6 @@
 mod http3;
+mod tcp;
+mod tls;
 
 use std::{
     env,
@@ -9,28 +11,37 @@ use std::{
 
 use axum::{
     Json, Router,
-    body::Body,
+    body::{Body, Bytes},
     http::{HeaderValue, Request, StatusCode, Uri, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{any, get},
 };
 use serde_json::{Value, json};
+use tokio::sync::watch;
 use tower_http::{
     compression::CompressionLayer,
     services::{ServeDir, ServeFile},
+    set_header::SetResponseHeaderLayer,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+const MAX_BODY_SIZE: usize = 1024 * 1024;
+type DynError = Box<dyn std::error::Error + Send + Sync>;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn main() -> Result<(), DynError> {
     let host = env::var("HOST")
         .unwrap_or_else(|_| "127.0.0.1".to_owned())
         .parse::<IpAddr>()?;
     let port = env::var("PORT")
         .unwrap_or_else(|_| "8443".to_owned())
         .parse::<u16>()?;
+    // Port, unter dem der Dienst von außen erreichbar ist (Compose bildet ihn auf PORT ab).
+    let public_port = match env::var("PUBLIC_PORT") {
+        Ok(value) => value.parse::<u16>()?,
+        Err(_) => port,
+    };
     let cert_path = env::var_os("TLS_CERT_PATH")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("/certs/fullchain.pem"));
@@ -42,28 +53,60 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     match env::args().nth(1).as_deref() {
         Some("--healthcheck") => {
             let address = healthcheck_address(host, port);
-            tokio::time::timeout(
-                Duration::from_secs(5),
-                http3::healthcheck(address, &cert_path, &server_name),
-            )
+            let certificates = tls::load_certificates(&cert_path)?;
+            tokio::time::timeout(Duration::from_secs(5), async {
+                let (status, _, body) =
+                    http3::request_once(address, &server_name, certificates.clone(), "/api/health")
+                        .await?;
+                verify_health("HTTP/3", status, &body)?;
+                let (status, _, body) =
+                    tcp::request_once(address, &server_name, certificates, "/api/health").await?;
+                verify_health("HTTPS über TCP", status, &body)
+            })
             .await
-            .map_err(|_| "HTTP/3-Healthcheck überschritt fünf Sekunden")??;
+            .map_err(|_| "Healthcheck überschritt fünf Sekunden")??;
             Ok(())
         }
         None => {
             let web_root = configured_root("WEB_ROOT", "/app/web", local_web_root());
             let asset_root = configured_root("ASSET_ROOT", "/app/assets", local_asset_root());
-            http3::serve(
-                SocketAddr::from((host, port)),
-                router(web_root, asset_root),
-                &cert_path,
-                &key_path,
-            )
-            .await?;
+            let address = SocketAddr::from((host, port));
+            let tls = tls::server_config(
+                tls::load_certificates(&cert_path)?,
+                tls::load_private_key(&key_path)?,
+            )?;
+            let app = router(web_root, asset_root).layer(SetResponseHeaderLayer::overriding(
+                header::ALT_SVC,
+                HeaderValue::from_str(&format!("h3=\":{public_port}\"; ma=86400"))?,
+            ));
+            let endpoint = http3::server_endpoint(address, tls.clone())?;
+            let listener = tokio::net::TcpListener::bind(address).await?;
+            println!(
+                "Totenrunde-Web lauscht auf https://{address}: HTTP/3 über UDP, \
+                 HTTP/1.1 und HTTP/2 über TCP mit Alt-Svc auf Port {public_port}"
+            );
+
+            let shutdown = shutdown_receiver();
+            tokio::try_join!(
+                http3::run_server(endpoint, app.clone(), wait_for_shutdown(shutdown.clone())),
+                tcp::run_server(listener, tls, app, wait_for_shutdown(shutdown)),
+            )?;
             Ok(())
         }
         Some(argument) => Err(format!("Unbekanntes Argument: {argument}").into()),
     }
+}
+
+fn verify_health(protocol: &str, status: StatusCode, body: &Bytes) -> Result<(), DynError> {
+    if status != StatusCode::OK {
+        return Err(format!("{protocol}-Healthcheck lieferte HTTP {status}").into());
+    }
+    let health: Value = serde_json::from_slice(body)?;
+    if health["status"] != "ok" {
+        return Err(format!("{protocol}-Healthcheck meldet keinen fehlerfreien Zustand").into());
+    }
+    println!("{protocol}-Healthcheck erfolgreich: {health}");
+    Ok(())
 }
 
 fn healthcheck_address(host: IpAddr, port: u16) -> SocketAddr {
@@ -73,6 +116,43 @@ fn healthcheck_address(host: IpAddr, port: u16) -> SocketAddr {
         address => address,
     };
     SocketAddr::from((address, port))
+}
+
+fn shutdown_receiver() -> watch::Receiver<bool> {
+    let (sender, receiver) = watch::channel(false);
+    tokio::spawn(async move {
+        shutdown_signal().await;
+        let _ = sender.send(true);
+    });
+    receiver
+}
+
+async fn wait_for_shutdown(mut receiver: watch::Receiver<bool>) {
+    let _ = receiver.wait_for(|stop| *stop).await;
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Strg+C-Handler konnte nicht installiert werden");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("SIGTERM-Handler konnte nicht installiert werden")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        () = ctrl_c => {},
+        () = terminate => {},
+    }
 }
 
 pub fn router(web_root: PathBuf, asset_root: PathBuf) -> Router {
