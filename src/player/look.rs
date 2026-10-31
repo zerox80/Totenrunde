@@ -30,6 +30,44 @@ pub fn cursor_grab(
     }
 }
 
+/// Browser: Der Pointer-Lock kann enden, ohne dass Bevy davon erfährt. Esc fängt der Browser
+/// selbst ab, dazu kommen Fokuswechsel und abgelehnte Anfragen. Der Modus bliebe dann auf
+/// `Locked` und würde nie neu angefordert; die Maus stieße am Bildschirmrand an. Stattdessen
+/// pausieren: Weiterspielen per Klick oder Esc fordert den Lock mit einer Nutzeraktion neu an.
+#[cfg(target_arch = "wasm32")]
+pub fn pause_on_lost_pointer_lock(
+    cursor: Single<&CursorOptions>,
+    game: Option<ResMut<InGame>>,
+    mut vtime: ResMut<Time<Virtual>>,
+    real: Res<Time<Real>>,
+    // (Lock schon einmal bestätigt, seit wann angefordert)
+    mut watch: Local<(bool, Option<f32>)>,
+) {
+    let Some(mut game) = game else {
+        *watch = default();
+        return;
+    };
+    if game.paused || cursor.grab_mode != CursorGrabMode::Locked {
+        *watch = default();
+        return;
+    }
+    let locked = web_sys::window()
+        .and_then(|window| window.document())
+        .and_then(|document| document.pointer_lock_element())
+        .is_some();
+    if locked {
+        *watch = (true, None);
+        return;
+    }
+    // Die Anfrage wird asynchron bestätigt; eine abgelehnte erkennt man nur an der Dauer.
+    let now = real.elapsed_secs();
+    let requested = *watch.1.get_or_insert(now);
+    if watch.0 || now - requested > 1.5 {
+        crate::base::set_paused(&mut game, &mut vtime, true);
+        *watch = default();
+    }
+}
+
 pub fn mouse_look(
     motion: Res<AccumulatedMouseMotion>,
     cfg: Res<DebugConfig>,

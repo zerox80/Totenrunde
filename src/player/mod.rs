@@ -37,6 +37,11 @@ impl Plugin for PlayerPlugin {
                     .run_if(resource_exists::<InGame>),
             )
             .add_systems(Update, (look::cursor_grab, spawn::apply_graphics));
+        #[cfg(target_arch = "wasm32")]
+        app.add_systems(
+            Update,
+            look::pause_on_lost_pointer_lock.before(look::cursor_grab),
+        );
     }
 }
 
