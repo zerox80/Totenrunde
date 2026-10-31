@@ -34,6 +34,7 @@ use bevy::window::{PresentMode, WindowResolution};
 fn main() {
     #[cfg(target_arch = "wasm32")]
     console_error_panic_hook::set_once();
+    base::i18n::set(&base::settings::Settings::load().language);
     base::platform::install_crash_handler();
     if !base::platform::check_assets() {
         return;

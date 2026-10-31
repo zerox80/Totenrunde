@@ -22,19 +22,19 @@
   </style>
 </head>
 <body>
-  <canvas id="game-canvas" tabindex="0" aria-label="Totenrunde-Spielansicht"></canvas>
+  <canvas id="game-canvas" tabindex="0" aria-label="Totenrunde-Spielansicht" data-i18n-label="canvas"></canvas>
   <div id="loading" class="overlay" role="status" aria-live="polite">
     <div class="panel">
       <h1>TOTENRUNDE</h1>
-      <p>Das Spiel wird geladen …</p>
-      <p class="hint">Bitte verwende einen aktuellen Browser mit WebAssembly- und WebGL-2-Unterstützung.</p>
+      <p data-i18n="loading">Das Spiel wird geladen …</p>
+      <p class="hint" data-i18n="loadingHint">Bitte verwende einen aktuellen Browser mit WebAssembly und WebGPU oder WebGL 2.</p>
     </div>
   </div>
   <div id="error" class="overlay" role="alert" hidden>
     <div class="panel">
-      <h1>Start nicht möglich</h1>
+      <h1 data-i18n="errorTitle">Start nicht möglich</h1>
       <p id="error-message" class="error"></p>
-      <p class="hint">Prüfe deine Internetverbindung und lade die Seite neu. Totenrunde benötigt einen aktuellen Browser mit WebAssembly und WebGL 2. Ältere oder stark eingeschränkte Browser werden nicht unterstützt.</p>
+      <p class="hint" data-i18n="errorHint">Prüfe deine Internetverbindung und lade die Seite neu. Totenrunde benötigt einen aktuellen Browser mit WebAssembly und WebGPU oder WebGL 2.</p>
     </div>
   </div>
   <script type="module" src="./main.js"></script>

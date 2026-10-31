@@ -7,6 +7,7 @@ use bevy::prelude::*;
 use super::{Focus, InteractKind, Interactable, Prompt, cost_text, try_buy};
 use crate::audio::{Sfx, SfxEvent};
 use crate::base::AppState;
+use crate::base::i18n::{t, tf};
 use crate::game::points::Score;
 use crate::weapons::{GiveWeapon, Loadout, WeaponSlot, def, take_current};
 use crate::world::mapdata::{MapFile, asset_exists};
@@ -118,7 +119,7 @@ pub fn use_pap(
         return;
     }
     if !power.on {
-        prompt.set("Der Strom muss eingeschaltet sein");
+        prompt.set(t("prompt.need_power"));
         return;
     }
     match pap.phase {
@@ -127,13 +128,10 @@ pub fn use_pap(
                 return;
             };
             if slot.upgraded {
-                prompt.set("Diese Waffe ist bereits aufgewertet");
+                prompt.set(t("prompt.already_upgraded"));
                 return;
             }
-            prompt.set(format!(
-                "Halte F, um die Waffe aufzuwerten {}",
-                cost_text(PAP_COST)
-            ));
+            prompt.set(tf("prompt.upgrade", &[("cost", &cost_text(PAP_COST))]));
             if focus.pressed && lo.can_act() && try_buy(&mut score, PAP_COST, &mut sfx) {
                 if let Some(slot) = take_current(&mut lo) {
                     pap.phase = PapPhase::Working { t: 0.0, slot };
@@ -156,7 +154,10 @@ pub fn use_pap(
             }
         }
         PapPhase::Ready { slot, .. } => {
-            prompt.set(format!("Halte F für {}", def(slot.weapon).pap_name));
+            prompt.set(tf(
+                "prompt.take",
+                &[("item", &def(slot.weapon).display_name(true))],
+            ));
             if focus.pressed {
                 give.write(GiveWeapon {
                     weapon: slot.weapon,

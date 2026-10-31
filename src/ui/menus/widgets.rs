@@ -6,6 +6,7 @@ use bevy::text::FontSize;
 use bevy::ui::Pressed;
 use bevy::ui_widgets::{Activate, Button};
 
+use crate::base::i18n::{Translated, t};
 use crate::base::{AppState, InGame, set_paused};
 
 /// Was ein Menüknopf auslöst.
@@ -35,9 +36,10 @@ pub fn text(s: impl Into<String>, font: &Handle<Font>, size: f32, color: Color) 
 }
 
 /// Knopf mit Beschriftung; Aktion wird beim Loslassen ausgeführt.
+/// Knopf mit übersetzter Beschriftung (`key` aus den Sprachdateien).
 pub fn button(
     parent: &mut ChildSpawnerCommands,
-    label: &str,
+    key: &'static str,
     action: MenuAction,
     font: &Handle<Font>,
 ) {
@@ -59,7 +61,10 @@ pub fn button(
             BackgroundColor(IDLE),
         ))
         .with_children(|b| {
-            b.spawn(text(label, font, 24.0, Color::srgb(0.92, 0.9, 0.86)));
+            b.spawn((
+                text(t(key), font, 24.0, Color::srgb(0.92, 0.9, 0.86)),
+                Translated(key),
+            ));
         })
         .observe(on_activate);
 }

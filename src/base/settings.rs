@@ -36,10 +36,18 @@ pub struct Settings {
     pub light_cones: bool,
     pub vsync: bool,
     pub show_fps: bool,
+    /// Sprachcode (siehe `i18n::LANGUAGES`) oder "auto" für Browser-/Systemsprache
+    pub language: String,
 }
 
-/// Namen der Grafikstufen
-pub const QUALITY_NAMES: [&str; 5] = ["NIEDRIG", "MITTEL", "HOCH", "EXTREM", "EIGENE"];
+/// Übersetzungsschlüssel der Grafikstufen
+pub const QUALITY_NAMES: [&str; 5] = [
+    "quality.low",
+    "quality.medium",
+    "quality.high",
+    "quality.extreme",
+    "quality.custom",
+];
 
 impl Default for Settings {
     fn default() -> Self {
@@ -62,6 +70,7 @@ impl Default for Settings {
             light_cones: true,
             vsync: true,
             show_fps: false,
+            language: "auto".into(),
         }
     }
 }

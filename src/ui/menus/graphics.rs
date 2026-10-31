@@ -1,6 +1,6 @@
-//! Grafik-Einstellungen: Stufen NIEDRIG / MITTEL / HOCH / EXTREM und einzelne Optionen.
-//! Änderungen wirken sofort (bis auf die Texturqualität, die beim nächsten Start greift)
-//! und werden in settings.json gespeichert.
+//! Einstellungen: Grafikstufen NIEDRIG / MITTEL / HOCH / EXTREM, einzelne Optionen und die
+//! Sprache. Änderungen wirken sofort (bis auf die Texturqualität, die beim nächsten Start
+//! greift) und werden in settings.json bzw. im Browser gespeichert.
 
 use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
@@ -9,6 +9,7 @@ use bevy::ui_widgets::{Activate, Button};
 
 use super::widgets::{BLOOD, HOVER, IDLE, PRESS, text};
 use crate::base::assets::GameAssets;
+use crate::base::i18n::{self, LANGUAGES, Translated, t};
 use crate::base::settings::{GraphicsMenuOpen, QUALITY_NAMES, Settings};
 
 pub struct GraphicsPlugin;
@@ -38,6 +39,7 @@ enum Opt {
     Fov,
     Vsync,
     Fps,
+    Language,
     Back,
 }
 
@@ -48,7 +50,7 @@ struct OptValue(Opt);
 #[derive(Component)]
 struct OpenGraphics;
 
-/// Knopf "GRAFIK" für Haupt- und Pausenmenü.
+/// Knopf "EINSTELLUNGEN" für Haupt- und Pausenmenü.
 pub fn open_button(parent: &mut ChildSpawnerCommands, font: &Handle<Font>) {
     parent
         .spawn((
@@ -68,46 +70,51 @@ pub fn open_button(parent: &mut ChildSpawnerCommands, font: &Handle<Font>) {
             BackgroundColor(IDLE),
         ))
         .with_children(|b| {
-            b.spawn(text("GRAFIK", font, 24.0, Color::srgb(0.92, 0.9, 0.86)));
+            b.spawn((
+                text(t("menu.settings"), font, 24.0, Color::srgb(0.92, 0.9, 0.86)),
+                Translated("menu.settings"),
+            ));
         })
         .observe(|_: On<Activate>, mut open: ResMut<GraphicsMenuOpen>| open.0 = true);
 }
 
+/// Übersetzungsschlüssel der Zeilenbeschriftung
 fn label(o: Opt) -> &'static str {
     match o {
-        Opt::Preset => "GRAFIKSTUFE",
-        Opt::Textures => "TEXTUREN",
+        Opt::Preset => "settings.preset",
+        Opt::Textures => "settings.textures",
         #[cfg(target_arch = "wasm32")]
-        Opt::RenderScale => "RENDERAUFLÖSUNG",
-        Opt::Msaa => "KANTENGLÄTTUNG",
-        Opt::Shadows => "ECHTZEIT-SCHATTEN",
-        Opt::Bloom => "LEUCHTEFFEKT (BLOOM)",
-        Opt::Film => "FILMLOOK",
-        Opt::AutoExposure => "AUGEN-ANPASSUNG",
-        Opt::Cones => "LICHTKEGEL",
-        Opt::Fov => "SICHTFELD",
-        Opt::Vsync => "VSYNC",
-        Opt::Fps => "FPS ANZEIGEN",
-        Opt::Back => "ZURÜCK",
+        Opt::RenderScale => "settings.render_scale",
+        Opt::Msaa => "settings.msaa",
+        Opt::Shadows => "settings.shadows",
+        Opt::Bloom => "settings.bloom",
+        Opt::Film => "settings.film",
+        Opt::AutoExposure => "settings.auto_exposure",
+        Opt::Cones => "settings.cones",
+        Opt::Fov => "settings.fov",
+        Opt::Vsync => "settings.vsync",
+        Opt::Fps => "settings.fps",
+        Opt::Language => "settings.language",
+        Opt::Back => "settings.back",
     }
 }
 
 fn onoff(b: bool) -> String {
-    if b { "AN".into() } else { "AUS".into() }
+    t(if b { "settings.on" } else { "settings.off" }).into()
 }
 
 fn value(o: Opt, s: &Settings) -> String {
     match o {
-        Opt::Preset => QUALITY_NAMES[s.quality.min(4) as usize].into(),
+        Opt::Preset => t(QUALITY_NAMES[s.quality.min(4) as usize]).into(),
         Opt::Textures => match s.texture_max {
-            0..=512 => "NIEDRIG (512)".into(),
-            513..=1024 => "MITTEL (1024)".into(),
-            _ => "HOCH (2048) *".into(),
+            0..=512 => t("settings.tex_low").into(),
+            513..=1024 => t("settings.tex_mid").into(),
+            _ => t("settings.tex_high").into(),
         },
         #[cfg(target_arch = "wasm32")]
         Opt::RenderScale => format!("{:.0} %", s.render_scale * 100.0),
         Opt::Msaa => match s.msaa {
-            0 => "AUS".into(),
+            0 => t("settings.off").into(),
             1 => "FXAA".into(),
             2 if !cfg!(feature = "webgpu") => "MSAA 2×".into(),
             _ => "MSAA 4×".into(),
@@ -117,9 +124,9 @@ fn value(o: Opt, s: &Settings) -> String {
         Opt::Film => onoff(s.film),
         Opt::AutoExposure => {
             if cfg!(feature = "webgpu") {
-                "NICHT IM BROWSER".into()
+                t("settings.not_browser").into()
             } else if cfg!(target_arch = "wasm32") {
-                "NICHT IN WEBGL2".into()
+                t("settings.not_webgl2").into()
             } else {
                 onoff(s.auto_exposure)
             }
@@ -128,11 +135,15 @@ fn value(o: Opt, s: &Settings) -> String {
         Opt::Fov => format!("{:.0}°", s.fov_deg),
         Opt::Vsync => onoff(s.vsync),
         Opt::Fps => onoff(s.show_fps),
+        Opt::Language if s.language == "auto" => {
+            format!("{} ({})", t("settings.auto"), i18n::current().name)
+        }
+        Opt::Language => i18n::current().name.into(),
         Opt::Back => String::new(),
     }
 }
 
-const ROWS: [Opt; 12 + cfg!(target_arch = "wasm32") as usize] = [
+const ROWS: [Opt; 13 + cfg!(target_arch = "wasm32") as usize] = [
     Opt::Preset,
     Opt::Textures,
     #[cfg(target_arch = "wasm32")]
@@ -146,6 +157,7 @@ const ROWS: [Opt; 12 + cfg!(target_arch = "wasm32") as usize] = [
     Opt::Fov,
     Opt::Vsync,
     Opt::Fps,
+    Opt::Language,
     Opt::Back,
 ];
 
@@ -176,7 +188,8 @@ fn sync(
             ))
             .with_children(|p| {
                 p.spawn((
-                    text("GRAFIK", &assets.font_black, 64.0, BLOOD),
+                    text(t("settings.title"), &assets.font_black, 64.0, BLOOD),
+                    Translated("settings.title"),
                     Node {
                         margin: UiRect::bottom(px(18)),
                         ..default()
@@ -190,10 +203,14 @@ fn sync(
                         o,
                         Node {
                             width: px(640),
-                            height: px(if back { 50.0 } else { 42.0 }),
-                            margin: UiRect::vertical(px(if back { 16.0 } else { 3.0 })),
+                            height: px(if back { 50.0 } else { 38.0 }),
+                            margin: UiRect::vertical(px(if back { 14.0 } else { 2.0 })),
                             padding: UiRect::horizontal(px(18)),
-                            justify_content: if back { JustifyContent::Center } else { JustifyContent::SpaceBetween },
+                            justify_content: if back {
+                                JustifyContent::Center
+                            } else {
+                                JustifyContent::SpaceBetween
+                            },
                             align_items: AlignItems::Center,
                             border: UiRect::left(px(if o == Opt::Preset { 6.0 } else { 3.0 })),
                             ..default()
@@ -202,18 +219,37 @@ fn sync(
                         BackgroundColor(IDLE),
                     ))
                     .with_children(|r| {
-                        r.spawn(text(label(o), &assets.font_bold, if o == Opt::Preset { 22.0 } else { 19.0 }, Color::srgb(0.92, 0.9, 0.86)));
+                        r.spawn((
+                            text(
+                                t(label(o)),
+                                &assets.font_bold,
+                                if o == Opt::Preset { 22.0 } else { 19.0 },
+                                Color::srgb(0.92, 0.9, 0.86),
+                            ),
+                            Translated(label(o)),
+                        ));
                         if !back {
-                            r.spawn((OptValue(o), text(value(o, &settings), &assets.font_black, 19.0, Color::srgb(1.0, 0.82, 0.55))));
+                            r.spawn((
+                                OptValue(o),
+                                text(
+                                    value(o, &settings),
+                                    &assets.font_black,
+                                    19.0,
+                                    Color::srgb(1.0, 0.82, 0.55),
+                                ),
+                            ));
                         }
                     })
                     .observe(on_click);
                 }
-                p.spawn(text(
-                    "* Texturen ändern sich beim nächsten Start · Klick schaltet weiter · Esc zurück",
-                    &assets.font_regular,
-                    15.0,
-                    Color::srgba(1.0, 1.0, 1.0, 0.45),
+                p.spawn((
+                    Translated("settings.footer"),
+                    text(
+                        t("settings.footer"),
+                        &assets.font_regular,
+                        15.0,
+                        Color::srgba(1.0, 1.0, 1.0, 0.45),
+                    ),
                 ));
             });
     } else if !open.0 && shown {
@@ -288,6 +324,19 @@ fn on_click(
         }
         Opt::Fps => {
             s.show_fps = !s.show_fps;
+            custom = false;
+        }
+        Opt::Language => {
+            // AUTOMATISCH → alle Sprachen der Reihe nach → wieder AUTOMATISCH
+            let next = match LANGUAGES.iter().position(|l| l.code == s.language) {
+                None => 0,
+                Some(i) if i + 1 < LANGUAGES.len() => i + 1,
+                Some(_) => usize::MAX,
+            };
+            s.language = LANGUAGES
+                .get(next)
+                .map_or_else(|| "auto".into(), |l| l.code.into());
+            i18n::set(&s.language);
             custom = false;
         }
         Opt::Back => {

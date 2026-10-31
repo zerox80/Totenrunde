@@ -7,6 +7,7 @@ use super::{Focus, InteractKind, Interactable, Prompt};
 use crate::audio::{Sfx, SfxEvent};
 use crate::base::AppState;
 use crate::base::debug::DebugConfig;
+use crate::base::i18n::t;
 use crate::world::mapdata::{MapFile, asset_exists};
 use crate::world::power::Power;
 
@@ -105,7 +106,7 @@ pub fn use_power_switch(
     if focus.kind != Some(InteractKind::Power) || power.on {
         return;
     }
-    prompt.set("Halte F, um den Strom einzuschalten");
+    prompt.set(t("prompt.power"));
     if focus.pressed {
         power.on = true;
         power.since = time.elapsed_secs();

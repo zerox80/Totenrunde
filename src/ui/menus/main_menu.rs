@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use super::widgets::{BLOOD, MenuAction, button, root, text};
 use crate::base::AppState;
 use crate::base::assets::GameAssets;
+use crate::base::i18n::{Translated, t};
 
 pub struct MainMenuPlugin;
 
@@ -25,26 +26,35 @@ fn spawn(mut commands: Commands, assets: Res<GameAssets>, lib: Option<Res<crate:
         ));
     }
     commands
-        .spawn((root(Color::srgb(0.025, 0.02, 0.02)), DespawnOnExit(AppState::Menu)))
+        .spawn((
+            root(Color::srgb(0.025, 0.02, 0.02)),
+            DespawnOnExit(AppState::Menu),
+        ))
         .with_children(|p| {
             p.spawn(text("TOTENRUNDE", &assets.font_black, 110.0, BLOOD));
             p.spawn((
-                text("ENDSTATION", &assets.font_bold, 26.0, Color::srgb(0.7, 0.68, 0.64)),
+                text(
+                    "ENDSTATION",
+                    &assets.font_bold,
+                    26.0,
+                    Color::srgb(0.7, 0.68, 0.64),
+                ),
                 Node {
                     margin: UiRect::bottom(px(60)),
                     ..default()
                 },
             ));
-            button(p, "SPIELEN", MenuAction::Play, &assets.font_bold);
+            button(p, "menu.play", MenuAction::Play, &assets.font_bold);
             super::graphics::open_button(p, &assets.font_bold);
-            button(p, "BEENDEN", MenuAction::Quit, &assets.font_bold);
+            button(p, "menu.quit", MenuAction::Quit, &assets.font_bold);
             p.spawn((
                 text(
-                    "Enter: Spielen   ·   Esc: Beenden\nWASD laufen · Maus zielen · Linksklick schießen · R nachladen · V Messer · G Granate · F benutzen",
+                    t("menu.help"),
                     &assets.font_regular,
                     16.0,
                     Color::srgba(1.0, 1.0, 1.0, 0.45),
                 ),
+                Translated("menu.help"),
                 TextLayout::justify(Justify::Center),
                 Node {
                     margin: UiRect::top(px(50)),

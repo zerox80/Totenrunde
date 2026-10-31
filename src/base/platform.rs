@@ -73,10 +73,9 @@ pub fn check_assets() -> bool {
     if root.join("maps").is_dir() {
         return true;
     }
-    show_error(&format!(
-        "Der Ordner „assets“ wurde nicht gefunden:\n{}\n\nBitte das heruntergeladene Archiv vollständig \
-         entpacken und Totenrunde aus dem entpackten Ordner starten.",
-        root.display()
+    show_error(&super::i18n::tf(
+        "error.assets_missing",
+        &[("path", &root.display())],
     ));
     false
 }
@@ -108,7 +107,7 @@ pub fn install_crash_handler() {
             .downcast_ref::<&str>()
             .map(|s| s.to_string())
             .or_else(|| info.payload().downcast_ref::<String>().cloned())
-            .unwrap_or_else(|| "unbekannter Fehler".into());
+            .unwrap_or_else(|| super::i18n::t("error.unknown").into());
         let at = info
             .location()
             .map(|l| format!("{}:{}", l.file(), l.line()))
@@ -123,9 +122,9 @@ pub fn install_crash_handler() {
             path = std::env::temp_dir().join("totenrunde-absturz.txt");
             let _ = std::fs::write(&path, &log);
         }
-        show_error(&format!(
-            "Totenrunde ist abgestürzt:\n\n{msg}\n\nDetails stehen in:\n{}",
-            path.display()
+        show_error(&super::i18n::tf(
+            "error.crashed",
+            &[("message", &msg), ("path", &path.display())],
         ));
         STATE.store(2, Ordering::SeqCst);
     }));

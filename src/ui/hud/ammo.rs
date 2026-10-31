@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use super::widgets::label;
 use crate::base::AppState;
 use crate::base::assets::GameAssets;
+use crate::base::i18n::t;
 use crate::weapons::{Loadout, def};
 
 #[derive(Component)]
@@ -145,14 +146,16 @@ pub fn update(
     >,
 ) {
     let h = match lo.current_slot() {
-        Some(s) if s.mag == 0 && s.reserve == 0 => "KEINE MUNITION",
+        Some(s) if s.mag == 0 && s.reserve == 0 => t("hud.no_ammo"),
         Some(s)
             if s.mag as f32 <= (def(s.weapon).mag_size(s.upgraded) as f32 * 0.25).max(1.0)
                 && s.reserve > 0 =>
         {
-            "NACHLADEN"
+            t("hud.reload")
         }
-        Some(s) if s.reserve <= def(s.weapon).mag_size(s.upgraded) && s.mag > 0 => "WENIG MUNITION",
+        Some(s) if s.reserve <= def(s.weapon).mag_size(s.upgraded) && s.mag > 0 => {
+            t("hud.low_ammo")
+        }
         _ => "",
     };
     for mut t in hint.iter_mut() {

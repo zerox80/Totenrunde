@@ -1,3 +1,7 @@
+import { t, translatePage } from "./i18n.js";
+
+translatePage();
+
 const loading = document.getElementById("loading");
 const error = document.getElementById("error");
 const errorMessage = document.getElementById("error-message");
@@ -19,9 +23,7 @@ function warnIfSoftwareRendering() {
   hint.style.cssText = "position:fixed;left:50%;top:1rem;transform:translateX(-50%);z-index:10;" +
     "max-width:42rem;padding:.9rem 1.2rem;border-left:4px solid #9e0d0a;background:#14100f;" +
     "color:#f4f4f5;font:15px/1.5 system-ui,sans-serif;box-shadow:0 4px 24px #000a";
-  hint.textContent = "Die Grafikbeschleunigung deines Browsers ist ausgeschaltet (" + renderer +
-    "). Das Spiel läuft dadurch extrem langsam. Einschalten: Browser-Einstellungen → System → " +
-    "„Grafikbeschleunigung verwenden, wenn verfügbar“, danach den Browser neu starten.";
+  hint.textContent = t("software", { renderer });
   document.body.append(hint);
 }
 
@@ -78,6 +80,6 @@ try {
   loading.hidden = true;
   error.hidden = false;
   errorMessage.textContent = cause instanceof Error
-    ? `Fehler beim Laden des Spiels: ${cause.message}`
-    : "Das Spiel konnte nicht geladen werden.";
+    ? t("loadError") + cause.message
+    : t("loadFailed");
 }

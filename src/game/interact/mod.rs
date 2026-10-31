@@ -125,7 +125,7 @@ fn reset_focus(mut focus: ResMut<Focus>, mut prompt: ResMut<Prompt>) {
 
 /// Kosten-Zusatz wie im Original: "[Kosten: 950]"
 pub fn cost_text(cost: u32) -> String {
-    format!("[Kosten: {cost}]")
+    crate::base::i18n::tf("prompt.cost", &[("cost", &cost)])
 }
 
 /// Punkte ausgeben, sonst Ablehnungs-Geräusch. Liefert true bei Erfolg.

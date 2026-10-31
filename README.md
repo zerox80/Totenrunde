@@ -9,6 +9,12 @@ Aufruf läuft über HTTPS/TCP, das den Browser auf HTTP/3 umleitet.
 
 **Aktuell ist das Spiel Solo; Online-Multiplayer ist nicht enthalten.**
 
+Sprachen: Deutsch, Englisch, Französisch, Spanisch, Italienisch, Portugiesisch, Niederländisch,
+Polnisch, Tschechisch, Türkisch, Russisch und Ukrainisch. Die Sprache folgt der Browser- bzw.
+Systemsprache und lässt sich unter **Einstellungen → Sprache** umstellen. Die Texte stehen in
+`src/base/lang/`; eine neue Sprache braucht dort eine Datei und einen Eintrag in
+`src/base/i18n.rs`.
+
 ## Windows oder Linux spielen
 
 1. Das passende Paket unter [Releases](https://github.com/zerox80/Totenrunde/releases/latest)

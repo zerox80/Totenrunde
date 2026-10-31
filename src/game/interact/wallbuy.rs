@@ -8,6 +8,7 @@ use bevy::prelude::*;
 use super::{Focus, InteractKind, Interactable, Prompt, cost_text, try_buy};
 use crate::audio::SfxEvent;
 use crate::base::AppState;
+use crate::base::i18n::tf;
 use crate::game::points::Score;
 use crate::weapons::{GiveWeapon, Loadout, def, weapon_index};
 use crate::world::mapdata::{MapFile, asset_exists};
@@ -157,10 +158,13 @@ pub fn use_wallbuy(
             let full = slot.reserve >= d.reserve_size(slot.upgraded)
                 && slot.mag >= d.mag_size(slot.upgraded);
             if full {
-                prompt.set(format!("{} – Munition voll", d.display_name(slot.upgraded)));
+                prompt.set(tf(
+                    "prompt.ammo_full",
+                    &[("item", &d.display_name(slot.upgraded))],
+                ));
                 return;
             }
-            prompt.set(format!("Halte F für Munition {}", cost_text(cost)));
+            prompt.set(tf("prompt.ammo", &[("cost", &cost_text(cost))]));
             if focus.pressed && try_buy(&mut score, cost, &mut sfx) {
                 give.write(GiveWeapon {
                     weapon: w,
@@ -170,7 +174,13 @@ pub fn use_wallbuy(
             }
         }
         None => {
-            prompt.set(format!("Halte F für {} {}", d.name, cost_text(d.wall_cost)));
+            prompt.set(tf(
+                "prompt.buy",
+                &[
+                    ("item", &d.display_name(false)),
+                    ("cost", &cost_text(d.wall_cost)),
+                ],
+            ));
             if focus.pressed && try_buy(&mut score, d.wall_cost, &mut sfx) {
                 give.write(GiveWeapon {
                     weapon: w,

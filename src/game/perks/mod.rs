@@ -77,7 +77,11 @@ impl Perk {
         }
     }
 
+    /// Name in der aktuellen Sprache (Schlüssel `perk.<id>`)
     pub fn name(self) -> &'static str {
+        if let Some(name) = crate::base::i18n::lookup(&format!("perk.{}", self.id())) {
+            return name;
+        }
         match self {
             Perk::QuickRevive => "Zweiter Atem",
             Perk::Juggernog => "Panzer-Tonikum",

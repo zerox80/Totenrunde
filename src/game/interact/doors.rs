@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use super::{Focus, InteractKind, Interactable, Prompt, cost_text, try_buy};
 use crate::audio::SfxEvent;
 use crate::base::AppState;
+use crate::base::i18n::tf;
 use crate::game::points::Score;
 use crate::world::doors::OpenDoor;
 use crate::world::mapdata::MapFile;
@@ -64,12 +65,12 @@ pub fn use_door(
     if zones.is_door_open(id) {
         return;
     }
-    let what = if d.debris {
-        "den Schutt wegzuräumen"
+    let key = if d.debris {
+        "prompt.debris"
     } else {
-        "die Tür zu öffnen"
+        "prompt.door"
     };
-    prompt.set(format!("Halte F, um {what} {}", cost_text(d.cost)));
+    prompt.set(tf(key, &[("cost", &cost_text(d.cost))]));
     if focus.pressed && try_buy(&mut score, d.cost, &mut sfx) {
         open.write(OpenDoor(id));
         score.doors += 1;

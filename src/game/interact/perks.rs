@@ -4,6 +4,7 @@ use bevy::prelude::*;
 
 use super::{Focus, InteractKind, Prompt, cost_text, try_buy};
 use crate::audio::{Sfx, SfxEvent};
+use crate::base::i18n::{t, tf};
 use crate::game::perks::Perks;
 use crate::game::points::Score;
 use crate::weapons::Loadout;
@@ -24,20 +25,19 @@ pub fn use_perk_machine(
         return;
     };
     if perk.needs_power() && !power.on {
-        prompt.set("Der Strom muss eingeschaltet sein");
+        prompt.set(t("prompt.need_power"));
         return;
     }
     if perks.has(perk) || perks.drinking.map(|d| d.0 == perk).unwrap_or(false) {
         return;
     }
     if perks.full() {
-        prompt.set("Du kannst keine weiteren Perks tragen");
+        prompt.set(t("prompt.perk_limit"));
         return;
     }
-    prompt.set(format!(
-        "Halte F für {} {}",
-        perk.name(),
-        cost_text(perk.cost())
+    prompt.set(tf(
+        "prompt.buy",
+        &[("item", &perk.name()), ("cost", &cost_text(perk.cost()))],
     ));
     if focus.pressed && lo.can_act() && try_buy(&mut score, perk.cost(), &mut sfx) {
         perks.drinking = Some((perk, DRINK_TIME));

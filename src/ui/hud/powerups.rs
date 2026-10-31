@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use super::widgets::label;
 use crate::base::AppState;
 use crate::base::assets::GameAssets;
+use crate::base::i18n::t;
 use crate::game::powerups::ActivePowerups;
 
 #[derive(Component, Clone, Copy, PartialEq)]
@@ -32,7 +33,7 @@ pub fn spawn(mut commands: Commands, assets: Res<GameAssets>) {
         ))
         .with_children(|p| {
             for (b, txt) in [
-                (PuBadge::Insta, "TOD"),
+                (PuBadge::Insta, t("hud.insta_kill")),
                 (PuBadge::Double, "×2"),
                 (PuBadge::FireSale, "%"),
             ] {

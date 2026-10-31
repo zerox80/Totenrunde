@@ -88,8 +88,15 @@ impl WeaponDef {
     pub fn ammo_cost(&self) -> u32 {
         self.wall_cost / 2
     }
+    /// Name in der aktuellen Sprache (Schlüssel `weapon.<id>` bzw. `weapon.<id>.pap`);
+    /// Eigennamen wie "MP5" haben keine Übersetzung und bleiben unverändert.
     pub fn display_name(&self, upgraded: bool) -> &'static str {
-        if upgraded { self.pap_name } else { self.name }
+        let key = if upgraded {
+            format!("weapon.{}.pap", self.id)
+        } else {
+            format!("weapon.{}", self.id)
+        };
+        crate::base::i18n::lookup(&key).unwrap_or(if upgraded { self.pap_name } else { self.name })
     }
     pub fn mag_size(&self, upgraded: bool) -> u32 {
         if upgraded { self.pap.mag } else { self.mag }

@@ -11,6 +11,7 @@ use rand::Rng;
 use super::{Focus, InteractKind, Interactable, Prompt, cost_text, try_buy};
 use crate::audio::{Sfx, SfxEvent};
 use crate::base::AppState;
+use crate::base::i18n::tf;
 use crate::game::points::Score;
 use crate::game::powerups::ActivePowerups;
 use crate::weapons::{GiveWeapon, Loadout, WEAPONS, def};
@@ -259,7 +260,7 @@ pub fn use_box(
     match mbox.phase {
         BoxPhase::Closed => {
             let cost = if fire_sale { FIRE_SALE_COST } else { BOX_COST };
-            prompt.set(format!("Halte F für eine Zufallswaffe {}", cost_text(cost)));
+            prompt.set(tf("prompt.box", &[("cost", &cost_text(cost))]));
             if focus.pressed && try_buy(&mut score, cost, &mut sfx) {
                 let mut rng = rand::rng();
                 let teddy_chance = if fire_sale || mbox.uses < 4 {
@@ -290,7 +291,10 @@ pub fn use_box(
             }
         }
         BoxPhase::Offer { weapon, .. } => {
-            prompt.set(format!("Halte F für {}", def(weapon).name));
+            prompt.set(tf(
+                "prompt.take",
+                &[("item", &def(weapon).display_name(false))],
+            ));
             if focus.pressed {
                 give.write(GiveWeapon {
                     weapon,

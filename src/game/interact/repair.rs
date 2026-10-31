@@ -6,6 +6,7 @@ use bevy::prelude::*;
 use super::{Focus, InteractKind, Interactable, Prompt};
 use crate::audio::{Sfx, SfxEvent};
 use crate::base::AppState;
+use crate::base::i18n::t;
 use crate::game::perks::{Perk, Perks};
 use crate::game::points::Score;
 use crate::game::powerups::ActivePowerups;
@@ -62,7 +63,7 @@ pub fn use_repair(
         *timer = 0.0;
         return;
     }
-    prompt.set("Halte F, um die Barrikade zu reparieren");
+    prompt.set(t("prompt.repair"));
     if !focus.held {
         *timer = 0.0;
         return;

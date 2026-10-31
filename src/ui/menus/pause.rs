@@ -4,6 +4,7 @@ use bevy::prelude::*;
 
 use super::widgets::{MenuAction, button, root, text};
 use crate::base::assets::GameAssets;
+use crate::base::i18n::{Translated, t};
 use crate::base::{AppState, InGame};
 
 pub struct PausePlugin;
@@ -35,20 +36,21 @@ fn sync(
             .with_children(|p| {
                 p.spawn((
                     text(
-                        "PAUSE",
+                        t("pause.title"),
                         &assets.font_black,
                         72.0,
                         Color::srgb(0.9, 0.88, 0.84),
                     ),
+                    Translated("pause.title"),
                     Node {
                         margin: UiRect::bottom(px(40)),
                         ..default()
                     },
                 ));
-                button(p, "WEITER", MenuAction::Resume, &assets.font_bold);
+                button(p, "pause.resume", MenuAction::Resume, &assets.font_bold);
                 super::graphics::open_button(p, &assets.font_bold);
-                button(p, "HAUPTMENÜ", MenuAction::MainMenu, &assets.font_bold);
-                button(p, "BEENDEN", MenuAction::Quit, &assets.font_bold);
+                button(p, "menu.main_menu", MenuAction::MainMenu, &assets.font_bold);
+                button(p, "menu.quit", MenuAction::Quit, &assets.font_bold);
             });
     } else if !game.paused && shown {
         for e in roots.iter() {

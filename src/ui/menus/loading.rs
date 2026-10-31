@@ -7,6 +7,7 @@ use bevy::prelude::*;
 use super::widgets::{BLOOD, IDLE, root, text};
 use crate::base::AppState;
 use crate::base::assets::LoadProgress;
+use crate::base::i18n::tf;
 
 const BACKGROUND: Color = Color::srgb(0.025, 0.02, 0.02);
 
@@ -71,12 +72,7 @@ fn spawn(mut commands: Commands, asset_server: Res<AssetServer>) {
             });
             p.spawn((
                 ProgressLabel,
-                text(
-                    "LADE …",
-                    &font_regular,
-                    16.0,
-                    Color::srgba(1.0, 1.0, 1.0, 0.55),
-                ),
+                text("", &font_regular, 16.0, Color::srgba(1.0, 1.0, 1.0, 0.55)),
                 Node {
                     margin: UiRect::top(px(16)),
                     ..default()
@@ -95,12 +91,16 @@ fn update(
         bar.width = percent(percent_done);
     }
     let label = if progress.textures_total > 0 && progress.fraction > 0.1 {
-        format!(
-            "TEXTUREN {} / {}  ·  {percent_done:.0} %",
-            progress.textures_done, progress.textures_total
+        tf(
+            "loading.textures",
+            &[
+                ("done", &progress.textures_done),
+                ("total", &progress.textures_total),
+                ("percent", &percent_done),
+            ],
         )
     } else {
-        format!("LADE MODELLE …  {percent_done:.0} %")
+        tf("loading.models", &[("percent", &percent_done)])
     };
     for mut text in &mut labels {
         if text.0 != label {
