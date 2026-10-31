@@ -10,10 +10,12 @@
 //! * `TR_SKIPMENU=1` – Hauptmenü überspringen, `TR_NOINPUT=1` – echte Eingaben ignorieren
 //! * `TR_POWER=1` – Strom ist von Anfang an eingeschaltet
 //! * `TR_MENUSHOT=/pfad/menu.png` – Screenshot des Hauptmenüs nach 1,5 s
+//! * `TR_LOADSHOT=/pfad/laden.png` – Screenshot des Ladebildschirms nach 1,5 s
 //! * `TR_MENUPLAY=1` – im Hauptmenü nach 3 s "Spielen" drücken (Enter)
 //! * `TR_GFXMENU=1` – Grafik-Menü beim Start öffnen
 //! * `TR_WEAPON=mp5`, `TR_PAP=1` – mit dieser (aufgewerteten) Waffe starten
-//! * Leistungstests: `TR_TEXMAX=512`, `TR_MSAA=0`, `TR_SHADOWS=1`, `TR_NOLIGHTS=1`, `TR_NOWALL=1`
+//! * Leistungstests: `TR_TEXMAX=512`, `TR_MSAA=0`, `TR_SHADOWS=1`, `TR_NOLIGHTS=1`, `TR_NOWALL=1`,
+//!   `TR_RENDERSCALE=0.5` (Renderauflösung wie im Browser, auch auf dem Desktop)
 
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, save_to_disk};
@@ -30,6 +32,7 @@ impl Plugin for DebugPlugin {
             .add_systems(OnEnter(AppState::Playing), apply_pose)
             .add_systems(Update, timed_actions.run_if(in_state(AppState::Playing)))
             .add_systems(Update, menu_test.run_if(in_state(AppState::Menu)))
+            .add_systems(Update, loading_shot.run_if(in_state(AppState::Loading)))
             .add_systems(
                 PreUpdate,
                 script_input
@@ -286,6 +289,25 @@ fn script_input(
                     }
                 }
             }
+        }
+    }
+}
+
+/// Screenshot des Ladebildschirms (`TR_LOADSHOT`).
+fn loading_shot(
+    mut commands: Commands,
+    time: Res<Time<Real>>,
+    mut t: Local<f32>,
+    mut done: Local<bool>,
+) {
+    *t += time.delta_secs();
+    if !*done && *t > 1.5 {
+        *done = true;
+        if let Ok(path) = std::env::var("TR_LOADSHOT") {
+            info!("Ladebildschirm-Screenshot: {path}");
+            commands
+                .spawn(Screenshot::primary_window())
+                .observe(save_to_disk(path));
         }
     }
 }

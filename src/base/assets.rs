@@ -1,24 +1,47 @@
 //! Zentrale Asset-Handles und Ladezustand.
 
+use bevy::asset::LoadState;
+use bevy::pbr::Lightmap;
+use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 use bevy::world_serialization::WorldAsset;
 
 use super::AppState;
+use crate::world::level::MapReady;
 
 pub struct AssetsPlugin;
 
 impl Plugin for AssetsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, load_assets).add_systems(
-            Update,
-            check_loaded.run_if(not(resource_exists::<AssetsReady>)),
-        );
+        app.init_resource::<LoadProgress>()
+            .add_systems(Startup, load_assets)
+            .add_systems(
+                Update,
+                (
+                    check_loaded.run_if(not(resource_exists::<AssetsReady>)),
+                    track_textures.run_if(not(resource_exists::<TexturesReady>)),
+                ),
+            );
     }
 }
 
 /// Wird eingefügt, sobald alle wichtigen Assets geladen sind.
 #[derive(Resource)]
 pub struct AssetsReady;
+
+/// Wird eingefügt, sobald alle Texturen der bekannten Materialien und Lightmaps geladen sind.
+/// Ohne sie zeichnet Bevy die betroffenen Flächen nicht; die Karte bliebe grau.
+#[derive(Resource)]
+pub struct TexturesReady;
+
+/// Ladefortschritt für den Ladebildschirm.
+#[derive(Resource, Default)]
+pub struct LoadProgress {
+    /// 0..=1, steigt nur an
+    pub fraction: f32,
+    pub textures_done: usize,
+    pub textures_total: usize,
+}
 
 /// Zombie-Modelle (Varianten). Fehlende Dateien werden übersprungen.
 pub const ZOMBIE_MODELS: &[&str] = &["models/zombie_m.gltf", "models/zombie_f.gltf"];
@@ -138,4 +161,59 @@ fn check_loaded(
     );
     commands.insert_resource(ZombieAnims { models });
     commands.insert_resource(AssetsReady);
+}
+
+/// Zählt die geladenen Texturen aller Materialien und Lightmaps. Erst wenn Karte und Zombies
+/// bereit sind, kennt das Spiel alle großen Materialien; bis dahin zählen nur diese beiden
+/// Schritte (die ersten 10 %).
+fn track_textures(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    materials: Res<Assets<StandardMaterial>>,
+    lightmaps: Query<&Lightmap>,
+    map: Option<Res<MapReady>>,
+    models: Option<Res<AssetsReady>>,
+    mut progress: ResMut<LoadProgress>,
+) {
+    let mut images = HashSet::new();
+    for (_, material) in materials.iter() {
+        images.extend(
+            [
+                &material.base_color_texture,
+                &material.emissive_texture,
+                &material.metallic_roughness_texture,
+                &material.normal_map_texture,
+                &material.occlusion_texture,
+            ]
+            .into_iter()
+            .flatten()
+            .map(Handle::id),
+        );
+    }
+    images.extend(lightmaps.iter().map(|lightmap| lightmap.image.id()));
+    // Selbst erzeugte Bilder kennt der AssetServer nicht (None); sie gelten als fertig.
+    let pending = images
+        .iter()
+        .filter(|id| {
+            matches!(
+                asset_server.get_load_state(**id),
+                Some(LoadState::NotLoaded | LoadState::Loading)
+            )
+        })
+        .count();
+    let steps = (map.is_some() as u8 + models.is_some() as u8) as f32 / 2.0;
+    let all_known = map.is_some() && models.is_some();
+    let textures = if all_known && !images.is_empty() {
+        (images.len() - pending) as f32 / images.len() as f32
+    } else {
+        0.0
+    };
+    progress.textures_total = images.len();
+    progress.textures_done = images.len() - pending;
+    progress.fraction = progress.fraction.max(0.1 * steps + 0.9 * textures);
+    if all_known && pending == 0 {
+        progress.fraction = 1.0;
+        info!("Alle {} Texturen geladen", images.len());
+        commands.insert_resource(TexturesReady);
+    }
 }

@@ -48,10 +48,11 @@ impl Plugin for StatePlugin {
 fn finish_loading(
     map: Option<Res<MapReady>>,
     assets: Option<Res<super::assets::AssetsReady>>,
+    textures: Option<Res<super::assets::TexturesReady>>,
     cfg: Res<super::debug::DebugConfig>,
     mut next: ResMut<NextState<AppState>>,
 ) {
-    if map.is_some() && assets.is_some() {
+    if map.is_some() && assets.is_some() && textures.is_some() {
         // Für automatische Tests direkt ins Spiel, sonst ins Hauptmenü
         next.set(if cfg.skip_menu {
             AppState::Playing

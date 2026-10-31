@@ -1,7 +1,8 @@
-//! Menüs: Hauptmenü, Pause und Game-Over-Bildschirm.
+//! Menüs: Ladebildschirm, Hauptmenü, Pause und Game-Over-Bildschirm.
 
 mod game_over;
 mod graphics;
+mod loading;
 mod main_menu;
 mod pause;
 mod widgets;
@@ -15,6 +16,7 @@ pub struct MenusPlugin;
 impl Plugin for MenusPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
+            loading::LoadingPlugin,
             main_menu::MainMenuPlugin,
             pause::PausePlugin,
             game_over::GameOverPlugin,
