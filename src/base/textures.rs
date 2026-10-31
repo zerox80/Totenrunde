@@ -3,8 +3,11 @@
 //!
 //! PNG-Dateien bringen keine Mipmaps mit; wir rechnen sie nach dem Laden auf der CPU aus
 //! (sRGB-korrekt für Farbtexturen) und hängen sie an die Bilddaten an.
+//!
+//! 3D-Texturen und Lightmaps werden danach nur noch auf der GPU gebraucht. Ihre Pixeldaten
+//! verlassen beim Hochladen den Arbeitsspeicher, statt dort ein zweites Mal zu liegen.
 
-use bevy::asset::AssetEvent;
+use bevy::asset::{AssetEvent, RenderAssetUsages};
 use bevy::image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor};
 use bevy::prelude::*;
 use bevy::render::render_resource::TextureFormat;
@@ -19,10 +22,11 @@ impl Plugin for TexturePlugin {
 
 /// Bilder ohne Mipmaps (z. B. Lightmaps, UI-Grafik), erkannt am Dateipfad.
 fn skip_path(path: &str) -> bool {
-    path.contains("/lm_")
-        || path.starts_with("lm_")
-        || path.starts_with("ui/")
-        || path.contains("fonts/")
+    path.contains("/lm_") || path.starts_with("lm_") || is_ui_path(path)
+}
+
+fn is_ui_path(path: &str) -> bool {
+    path.starts_with("ui/") || path.contains("fonts/")
 }
 
 fn add_mipmaps(
@@ -46,6 +50,10 @@ fn add_mipmaps(
         let Some(mut img) = images.get_mut(id) else {
             continue;
         };
+        // UI-Grafik bleibt unangetastet; alles andere braucht nach dem Hochladen keine CPU-Kopie
+        if !is_ui_path(&path) {
+            img.asset_usage = RenderAssetUsages::RENDER_WORLD;
+        }
         if is_lightmap {
             // Lightmaps: weich filtern, an den Rändern nicht wiederholen
             img.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
@@ -70,15 +78,15 @@ fn add_mipmaps(
         if w < 64 || h < 64 || img.texture_descriptor.size.depth_or_array_layers != 1 {
             continue;
         }
-        let Some(data) = img.data.as_ref() else {
-            continue;
-        };
-        if data.len() != w * h * 4 {
+        if img.data.as_ref().is_none_or(|data| data.len() != w * h * 4) {
             continue;
         }
+        let Some(data) = img.data.take() else {
+            continue;
+        };
         // Texturqualität: große Texturen beim Laden verkleinern (spart Grafikspeicher)
         let max = tex_max();
-        let (mut base, mut w, mut h) = (data.clone(), w, h);
+        let (mut base, mut w, mut h) = (data, w, h);
         while w > max || h > max {
             let (b, nw, nh) = halve(&base, w, h, srgb);
             base = b;
