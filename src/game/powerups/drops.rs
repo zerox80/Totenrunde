@@ -8,6 +8,7 @@ use crate::audio::{Sfx, SfxEvent};
 use crate::base::AppState;
 use crate::game::balance::Balance;
 use crate::game::points::Score;
+use crate::net::Team;
 use crate::world::nav::NavGrid;
 use crate::zombies::{DamageKind, ZombieKilled};
 
@@ -16,7 +17,7 @@ pub fn spawn_powerup(
     asset_server: &AssetServer,
     kind: PowerupKind,
     pos: Vec3,
-) {
+) -> Entity {
     let base = Vec3::new(pos.x, 0.0, pos.z);
     commands
         .spawn((
@@ -46,7 +47,8 @@ pub fn spawn_powerup(
                 },
                 Transform::from_xyz(0.0, 0.2, 0.0),
             ));
-        });
+        })
+        .id()
 }
 
 pub fn drop_powerups(
@@ -56,10 +58,16 @@ pub fn drop_powerups(
     mut pu: ResMut<ActivePowerups>,
     bal: Res<Balance>,
     score: Res<Score>,
+    team: Option<Res<Team>>,
     nav: Res<NavGrid>,
     mut sfx: MessageWriter<SfxEvent>,
 ) {
     let mut rng = rand::rng();
+    // Im Koop zählen die verdienten Punkte aller Spieler
+    let earned = score.earned
+        + team
+            .map(|t| t.members.iter().map(|m| m.state.earned).sum::<u64>())
+            .unwrap_or(0);
     for k in killed.read() {
         if k.kind == DamageKind::Nuke || pu.drops_this_round >= 4 {
             continue;
@@ -68,18 +76,19 @@ pub fn drop_powerups(
         if !nav.walkable(k.pos) {
             continue;
         }
-        let by_score = score.earned >= pu.next_drop_score;
+        let by_score = earned >= pu.next_drop_score;
         let by_chance = rng.random::<f32>() < bal.drop_chance;
         if !(by_score || by_chance) {
             continue;
         }
         if by_score {
             pu.increment *= bal.drop_growth;
-            pu.next_drop_score = score.earned + pu.increment as u64;
+            pu.next_drop_score = earned + pu.increment as u64;
         }
         pu.drops_this_round += 1;
         let kind = pu.next_kind();
         spawn_powerup(&mut commands, &asset_server, kind, k.pos);
+
         sfx.write(SfxEvent::at(Sfx::PowerupSpawn, k.pos + Vec3::Y));
     }
 }

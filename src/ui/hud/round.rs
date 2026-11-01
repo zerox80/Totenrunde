@@ -47,6 +47,15 @@ pub fn spawn(mut commands: Commands, asset_server: Res<AssetServer>, assets: Res
                     ..default()
                 },
             ));
+            // Koop: Punkte der Mitspieler über den eigenen
+            p.spawn((
+                super::team::TeamList,
+                Node {
+                    flex_direction: FlexDirection::Column,
+                    row_gap: px(3),
+                    ..default()
+                },
+            ));
             p.spawn((
                 super::points::PointsAnchor,
                 Node {

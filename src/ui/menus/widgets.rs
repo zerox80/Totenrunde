@@ -8,13 +8,18 @@ use bevy::ui_widgets::{Activate, Button};
 
 use crate::base::i18n::{Translated, t};
 use crate::base::{AppState, InGame, set_paused};
+use crate::net::{Online, Session};
 
 /// Was ein Menüknopf auslöst.
 #[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum MenuAction {
     Play,
+    /// Koop-Menü (Konto und Lobbys)
+    Multiplayer,
     Resume,
     MainMenu,
+    /// Koop: laufende Partie verlassen (zurück zu den Lobbys)
+    LeaveGame,
     Quit,
 }
 
@@ -86,6 +91,7 @@ pub fn button_visuals(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn on_activate(
     ev: On<Activate>,
     actions: Query<&MenuAction>,
@@ -93,16 +99,25 @@ fn on_activate(
     mut exit: MessageWriter<AppExit>,
     mut game: Option<ResMut<InGame>>,
     mut vtime: ResMut<Time<Virtual>>,
+    mut online: ResMut<Online>,
+    mut commands: Commands,
 ) {
-    if let Ok(action) = actions.get(ev.entity) {
-        apply(
-            *action,
-            &mut next,
-            &mut exit,
-            game.as_deref_mut(),
-            &mut vtime,
-        );
+    let Ok(action) = actions.get(ev.entity) else {
+        return;
+    };
+    if *action == MenuAction::LeaveGame {
+        online.send(totenrunde_mp_client::protocol::ClientMsg::LeaveLobby);
+        commands.remove_resource::<Session>();
+        next.set(AppState::Multiplayer);
+        return;
     }
+    apply(
+        *action,
+        &mut next,
+        &mut exit,
+        game.as_deref_mut(),
+        &mut vtime,
+    );
 }
 
 pub fn apply(
@@ -114,6 +129,7 @@ pub fn apply(
 ) {
     match action {
         MenuAction::Play => next.set(AppState::Playing),
+        MenuAction::Multiplayer | MenuAction::LeaveGame => next.set(AppState::Multiplayer),
         MenuAction::Resume => {
             if let Some(g) = game {
                 set_paused(g, vtime, false);

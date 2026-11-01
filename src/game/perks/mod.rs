@@ -94,12 +94,23 @@ impl Perk {
 
     pub fn description(self) -> &'static str {
         match self {
-            Perk::QuickRevive => "Selbstwiederbelebung (solo, 3x) und schnellere Heilung",
+            Perk::QuickRevive => {
+                "Selbstwiederbelebung (solo), im Koop schnelleres Wiederbeleben; schnellere Heilung"
+            }
             Perk::Juggernog => "Hält 2,5-mal so viele Treffer aus",
             Perk::SpeedCola => "Doppelt so schnell nachladen und Barrikaden reparieren",
             Perk::DoubleTap => "Schnellere Feuerrate, doppelter Schaden",
             Perk::StaminUp => "Schneller und länger sprinten",
             Perk::MuleKick => "Eine dritte Waffe tragen",
+        }
+    }
+
+    /// Preis je nach Spielerzahl: Zweiter Atem kostet solo nur 500, im Koop 1500
+    pub fn cost_for(self, players: u32) -> u32 {
+        if self == Perk::QuickRevive && players > 1 {
+            1500
+        } else {
+            self.cost()
         }
     }
 

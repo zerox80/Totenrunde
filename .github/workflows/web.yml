@@ -54,10 +54,13 @@ jobs:
           sh -n backend/certbot-deploy.sh
           sh -n backend/install-binaryen.sh
           docker compose --env-file backend/.env.example -f backend/compose.yaml config --quiet
-      - name: Backend prüfen und testen
+      - name: Backend und Konto-Seite prüfen und testen
         run: |
-          cargo clippy --locked --manifest-path backend/Cargo.toml -- -D warnings
+          cargo clippy --locked --manifest-path backend/Cargo.toml --all-targets -- -D warnings
           cargo test --locked --manifest-path backend/Cargo.toml
+          node --test backend/tests/konto.test.mjs
+      - name: Spiel testen (Übersetzungen, Netzwerknachrichten)
+        run: cargo test --locked --bin totenrunde
       - name: Optimiertes WebAssembly bauen
         run: |
           cargo build --release --locked --target wasm32-unknown-unknown --bin totenrunde

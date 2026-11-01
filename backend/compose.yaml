@@ -12,8 +12,12 @@ services:
       TLS_SERVER_NAME: ${TLS_SERVER_NAME:-localhost}
       TLS_CERT_PATH: /certs/fullchain.pem
       TLS_KEY_PATH: /certs/privkey.pem
+      # Koop-Multiplayer (in .env mit MULTIPLAYER=0 abschaltbar)
+      MULTIPLAYER: ${MULTIPLAYER:-1}
     volumes:
       - "${CERT_DIR:-./certs}:/certs:ro"
+      # Konten und Spielstatistik: Docker-Volume oder Ordner (DATA_DIR in .env)
+      - "${DATA_DIR:-totenrunde-data}:/data"
     restart: unless-stopped
     read_only: true
     tmpfs:
@@ -28,3 +32,6 @@ services:
       timeout: 10s
       start_period: 10s
       retries: 3
+
+volumes:
+  totenrunde-data:

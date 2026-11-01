@@ -9,7 +9,7 @@ use super::projectiles::ProjectileBody;
 use crate::audio::{Sfx, SfxEvent};
 use crate::base::{AppState, InGame};
 use crate::player::{Player, PlayerCamera};
-use crate::zombies::{DamageKind, HitPart, Zombie, ZombieHit, ZombieRig};
+use crate::zombies::{Attacker, DamageKind, HitPart, Zombie, ZombieHit, ZombieRig};
 
 #[allow(clippy::too_many_arguments)]
 pub fn melee_and_throw(
@@ -61,6 +61,7 @@ pub fn melee_and_throw(
             }
             if let Some((e, _, c)) = best {
                 hits.write(ZombieHit {
+                    by: Attacker::Local,
                     zombie: e,
                     damage: KNIFE_DAMAGE,
                     part: HitPart::Torso,

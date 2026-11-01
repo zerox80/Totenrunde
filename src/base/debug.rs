@@ -14,6 +14,9 @@
 //! * `TR_MENUPLAY=1` – im Hauptmenü nach 3 s "Spielen" drücken (Enter)
 //! * `TR_GFXMENU=1` – Grafik-Menü beim Start öffnen
 //! * `TR_WEAPON=mp5`, `TR_PAP=1` – mit dieser (aufgewerteten) Waffe starten
+//! * Koop: `TR_SERVER=http://127.0.0.1:8080` – Server, `TR_TOKEN=…` – Sitzungstoken (statt
+//!   des gespeicherten), `TR_MP=host|join` – Lobby anlegen bzw. der ersten beitreten und
+//!   starten, `TR_MP_PLAYERS=2` – so viele Spieler abwarten
 //! * Leistungstests: `TR_TEXMAX=512`, `TR_MSAA=0`, `TR_SHADOWS=1`, `TR_NOLIGHTS=1`, `TR_NOWALL=1`,
 //!   `TR_RENDERSCALE=0.5` (Renderauflösung wie im Browser, auch auf dem Desktop)
 
@@ -29,7 +32,10 @@ impl Plugin for DebugPlugin {
     fn build(&self, app: &mut App) {
         let cfg = DebugConfig::from_env();
         app.insert_resource(cfg)
-            .add_systems(OnEnter(AppState::Playing), apply_pose)
+            .add_systems(
+                OnEnter(AppState::Playing),
+                apply_pose.after(crate::player::spawn_player),
+            )
             .add_systems(Update, timed_actions.run_if(in_state(AppState::Playing)))
             .add_systems(Update, menu_test.run_if(in_state(AppState::Menu)))
             .add_systems(Update, loading_shot.run_if(in_state(AppState::Loading)))
@@ -157,7 +163,9 @@ impl DebugConfig {
         c.start_power = std::env::var("TR_POWER").is_ok();
         c.active = !c.shots.is_empty() || c.exit_at.is_some() || !c.script.is_empty();
         c.no_input = c.active || std::env::var("TR_NOINPUT").is_ok();
-        c.skip_menu = c.active || std::env::var("TR_SKIPMENU").is_ok();
+        // Koop-Tests (TR_MP) gehen über das Multiplayer-Menü statt direkt ins Spiel
+        c.skip_menu = (c.active && std::env::var_os("TR_MP").is_none())
+            || std::env::var("TR_SKIPMENU").is_ok();
         c
     }
 }

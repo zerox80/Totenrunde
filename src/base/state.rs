@@ -1,4 +1,4 @@
-//! Spielzustände (Laden, Menü, Spiel, Game Over), Pause und Spielzeit.
+//! Spielzustände (Laden, Menü, Multiplayer-Menü, Spiel, Game Over), Pause und Spielzeit.
 
 use bevy::prelude::*;
 
@@ -9,6 +9,8 @@ pub enum AppState {
     #[default]
     Loading,
     Menu,
+    /// Konto und Lobbys (Koop)
+    Multiplayer,
     Playing,
     GameOver,
 }
@@ -26,9 +28,12 @@ pub enum GameSet {
 /// Existiert, solange eine Partie läuft.
 #[derive(Resource, Default)]
 pub struct InGame {
+    /// Pausenmenü offen. Im Koop läuft die Welt dabei weiter.
     pub paused: bool,
     /// Spielzeit in Sekunden (ohne Pausen)
     pub time: f32,
+    /// Koop-Partie (die Zeit lässt sich nicht anhalten)
+    pub multiplayer: bool,
 }
 
 pub struct StatePlugin;
@@ -62,8 +67,15 @@ fn finish_loading(
     }
 }
 
-fn start_game(mut commands: Commands, mut vtime: ResMut<Time<Virtual>>) {
-    commands.insert_resource(InGame::default());
+fn start_game(
+    mut commands: Commands,
+    mut vtime: ResMut<Time<Virtual>>,
+    session: Option<Res<crate::net::Session>>,
+) {
+    commands.insert_resource(InGame {
+        multiplayer: session.is_some(),
+        ..default()
+    });
     vtime.unpause();
 }
 
@@ -96,7 +108,7 @@ fn toggle_pause(
 
 pub fn set_paused(game: &mut InGame, vtime: &mut Time<Virtual>, paused: bool) {
     game.paused = paused;
-    if paused {
+    if paused && !game.multiplayer {
         vtime.pause();
     } else {
         vtime.unpause();

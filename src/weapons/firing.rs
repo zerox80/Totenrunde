@@ -7,18 +7,21 @@ use bevy::light::NotShadowCaster;
 use bevy::prelude::*;
 use rand::Rng;
 
+use super::ShotFired;
 use super::assets::WeaponAssets;
 use super::defs::{FireMode, Projectile, WeaponClass, def};
 use super::input::start_reload;
 use super::loadout::{Loadout, WState};
-use super::projectiles::{ProjectileBody, Tracer, explode};
+use super::projectiles::{Blast, ProjectileBody, Tracer, explode};
 use crate::audio::{Sfx, SfxEvent};
 use crate::base::{AppState, InGame};
 use crate::fx::FxEvent;
 use crate::game::perks::{Perk, Perks};
 use crate::player::{Player, PlayerCamera, PlayerDamage};
 use crate::world::collision::{CollisionWorld, F_BULLET};
-use crate::zombies::{DamageKind, HitPart, Zombie, ZombieHit, ZombieRig, raycast_zombies};
+use crate::zombies::{
+    Attacker, DamageKind, HitPart, Zombie, ZombieHit, ZombieRig, raycast_zombies,
+};
 
 pub fn spread_dir(
     forward: Vec3,
@@ -52,6 +55,7 @@ pub fn fire_weapons(
     mut fx: MessageWriter<FxEvent>,
     mut sfx: MessageWriter<SfxEvent>,
     mut dmg: MessageWriter<PlayerDamage>,
+    (mut blasts, mut shots): (MessageWriter<Blast>, MessageWriter<ShotFired>),
 ) {
     if ingame.paused {
         return;
@@ -153,6 +157,8 @@ pub fn fire_weapons(
 
     let sound_pitch = if slot.upgraded { 0.92 } else { 1.0 };
     sfx.write(SfxEvent::ui(d.sound).pitch(sound_pitch));
+    // Ende der Leuchtspur für die Mitspieler (erste Kugel)
+    let mut shot_end = origin + forward * 1.5;
 
     match d.projectile {
         Projectile::Hitscan => {
@@ -178,6 +184,7 @@ pub fn fire_weapons(
                     };
                     let point = origin + dir * h.t;
                     hits.write(ZombieHit {
+                        by: Attacker::Local,
                         zombie: h.zombie,
                         damage: d.damage * dmg_mult * part_mult * falloff * pen_mult,
                         part: h.part,
@@ -224,8 +231,12 @@ pub fn fire_weapons(
                         &mut fx,
                         &mut sfx,
                         &mut dmg,
+                        &mut blasts,
                         false,
                     );
+                }
+                if d.pellets == 1 {
+                    shot_end = origin + dir * max_t.min(60.0);
                 }
                 // Leuchtspur (jede dritte Kugel)
                 if lo.shots % 3 == 0 && d.pellets == 1 {
@@ -304,6 +315,13 @@ pub fn fire_weapons(
             ));
         }
     }
+
+    shots.write(ShotFired {
+        weapon: slot.weapon,
+        upgraded: slot.upgraded,
+        origin,
+        end: shot_end,
+    });
 
     // Rückstoß
     let side = rng.random_range(-1.0..1.0) * d.recoil_side;

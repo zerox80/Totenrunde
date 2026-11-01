@@ -1,15 +1,14 @@
-//! Menüs: Ladebildschirm, Hauptmenü, Pause und Game-Over-Bildschirm.
+//! Menüs: Ladebildschirm, Hauptmenü, Multiplayer, Pause und Game-Over-Bildschirm.
 
 mod game_over;
 mod graphics;
 mod loading;
 mod main_menu;
+mod multiplayer;
 mod pause;
 mod widgets;
 
 use bevy::prelude::*;
-
-pub use widgets::MenuAction;
 
 pub struct MenusPlugin;
 
@@ -18,6 +17,7 @@ impl Plugin for MenusPlugin {
         app.add_plugins((
             loading::LoadingPlugin,
             main_menu::MainMenuPlugin,
+            multiplayer::MultiplayerPlugin,
             pause::PausePlugin,
             game_over::GameOverPlugin,
             graphics::GraphicsPlugin,

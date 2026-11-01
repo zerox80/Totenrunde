@@ -302,16 +302,61 @@ def check_dns_and_challenge_port(domain):
         ) from error
 
 
+def optional(existing, key, default):
+    """Optionale Einstellung: eingeschaltet lassen, wenn sie schon in .env aktiv war."""
+    if key in existing:
+        return f"{key}={existing[key]}"
+    return f"#{key}={default}"
+
+
+def env_content(settings, existing):
+    """backend/.env im Aufbau von .env.example (kommentiert, Optionen zum Einkommentieren)."""
+    return f"""# ============================================================================
+#  Totenrunde-Server – Einstellungen für Docker Compose (backend/compose.yaml)
+#
+#  Zeilen ohne # sind aktiv. Optionale Einstellungen stehen mit # davor:
+#  zum Einschalten das # entfernen, zum Ausschalten wieder davorsetzen.
+#  Danach im Repository-Stammverzeichnis neu starten:
+#    docker compose --env-file backend/.env -f backend/compose.yaml up -d
+#
+#  Erzeugt von backend/install.py; eingeschaltete optionale Werte bleiben beim
+#  nächsten Lauf erhalten.
+# ============================================================================
+
+# --- Domain und Zertifikat (Pflicht) -----------------------------------------
+# Öffentlicher Domainname; das Let's-Encrypt-Zertifikat gilt für ihn.
+DOMAIN={settings['domain']}
+TLS_SERVER_NAME={settings['domain']}
+# E-Mail für Let's Encrypt (Hinweise vor Ablauf des Zertifikats)
+CERTBOT_EMAIL={settings['email']}
+# Ordner mit fullchain.pem und privkey.pem (relativ zu backend/)
+CERT_DIR=./certs
+
+# --- Netzwerk -----------------------------------------------------------------
+# Port für HTTPS (TCP) und HTTP/3 (UDP); beide müssen in der Firewall offen sein.
+PORT={settings['port']}
+
+# --- Container-Image ----------------------------------------------------------
+IMAGE={settings['image']}
+# latest = neuester Stand von main; für eine feste Version z. B. TAG=v0.2.0
+TAG={settings['tag']}
+
+# --- Multiplayer --------------------------------------------------------------
+# Koop mit Konten, Lobbys und Bestenliste ist eingeschaltet. Zum Abschalten
+# einkommentieren: Das Spiel bleibt solo spielbar, das Multiplayer-Menü meldet
+# dann „Server nicht erreichbar“.
+{optional(existing, "MULTIPLAYER", "0")}
+
+# Konten und Statistik liegen im Docker-Volume "totenrunde-data". Stattdessen
+# einen Ordner auf dem Server verwenden (leichter zu sichern); er muss dem
+# Container-Benutzer 10001 gehören:
+#   mkdir -p backend/data && sudo chown 10001:10001 backend/data
+{optional(existing, "DATA_DIR", "./data")}
+"""
+
+
 def write_configuration(installer, settings):
-    content = (
-        f"PORT={settings['port']}\n"
-        f"IMAGE={settings['image']}\n"
-        f"TAG={settings['tag']}\n"
-        f"DOMAIN={settings['domain']}\n"
-        f"TLS_SERVER_NAME={settings['domain']}\n"
-        "CERT_DIR=./certs\n"
-        f"CERTBOT_EMAIL={settings['email']}\n"
-    )
+    content = env_content(settings, read_env())
     installer.write(ENV_FILE, content, 0o600)
     installer.run(["chmod", "+x", str(DEPLOY_SCRIPT)])
 

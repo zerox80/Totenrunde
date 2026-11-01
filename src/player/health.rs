@@ -1,17 +1,31 @@
-//! Gesundheit, Schaden, Regeneration und "Letztes Gefecht" (Solo mit Zweiter Atem:
-//! automatische Wiederbelebung nach 10 Sekunden, Verlust aller Perks).
+//! Gesundheit, Schaden, Regeneration und "Letztes Gefecht".
+//!
+//! * Solo mit Zweiter Atem: automatische Wiederbelebung nach 10 Sekunden, Verlust aller Perks.
+//! * Koop: Wer fällt, liegt 45 Sekunden am Boden und kann mit der Pistole weiterschießen, bis
+//!   ein Mitspieler ihn wiederbelebt. Sonst blutet er aus und kehrt zu Beginn der nächsten
+//!   Runde zurück. Liegen alle am Boden, ist das Spiel vorbei (entscheidet der Host).
 
 use bevy::prelude::*;
 
 use super::{Player, Stance};
 use crate::audio::{Sfx, SfxEvent};
+use crate::base::InGame;
 use crate::base::debug::DebugConfig;
 use crate::game::perks::{Perk, Perks};
 use crate::game::points::Score;
-use crate::weapons::{Loadout, enter_last_stand, leave_last_stand};
+use crate::game::rounds::RoundStarted;
+use crate::net::{Session, local_slot};
+use crate::weapons::{Loadout, WState, enter_last_stand, leave_last_stand, starting_loadout};
+use crate::world::mapdata::MapFile;
 
 pub const REGEN_DELAY: f32 = 2.8;
 pub const REVIVE_TIME: f32 = 10.0;
+/// Koop: so lange kann man am Boden auf Hilfe warten
+pub const BLEED_TIME: f32 = 45.0;
+
+/// Koop: Ein Mitspieler hat uns wiederbelebt.
+#[derive(Message, Clone, Copy)]
+pub struct Revived;
 
 #[derive(Message, Clone, Copy)]
 pub struct PlayerDamage {
@@ -31,7 +45,7 @@ pub struct Health {
     pub hit_dir: Vec3,
     pub downed: bool,
     pub down_time: f32,
-    /// Zeit bis zur Selbstwiederbelebung (Zweiter Atem, Solo)
+    /// Zeit bis zur Selbstwiederbelebung (Zweiter Atem, Solo) bzw. bis zum Ausbluten (Koop)
     pub revive_left: f32,
     pub dead: bool,
     pub heartbeat_cd: f32,
@@ -68,8 +82,12 @@ pub fn player_health(
     mut sfx: MessageWriter<SfxEvent>,
     mut over: ResMut<GameOverFlag>,
     cfg: Res<DebugConfig>,
+    game: Res<InGame>,
+    mut revived: MessageReader<Revived>,
 ) {
     let dt = time.delta_secs();
+    let coop = game.multiplayer;
+    let was_revived = revived.read().count() > 0;
     let (ref mut p, ref mut h, tf, ref mut lo) = *q;
     h.since_hit += dt;
     h.hurt_flash = (h.hurt_flash - dt * 0.9).max(0.0);
@@ -94,7 +112,15 @@ pub fn player_health(
             h.hp = 0.0;
             score.downs += 1;
             sfx.write(SfxEvent::ui(Sfx::PlayerDown));
-            if perks.has(Perk::QuickRevive) {
+            if coop {
+                // Am Boden, bis ein Mitspieler hilft oder die Zeit abläuft
+                h.downed = true;
+                h.down_time = 0.0;
+                h.revive_left = BLEED_TIME;
+                perks.on_down();
+                p.stance = Stance::Prone;
+                enter_last_stand(lo);
+            } else if perks.has(Perk::QuickRevive) {
                 h.downed = true;
                 h.down_time = 0.0;
                 h.revive_left = REVIVE_TIME;
@@ -114,14 +140,33 @@ pub fn player_health(
         h.revive_left -= dt;
         p.stance = Stance::Prone;
         p.speed_mult = 0.35;
-        if h.revive_left <= 0.0 {
+        let stand_up = if coop {
+            was_revived
+        } else {
+            h.revive_left <= 0.0
+        };
+        if stand_up {
             h.downed = false;
             h.hp = h.max;
+            h.since_hit = 0.0;
             p.speed_mult = 1.0;
             p.stance = Stance::Stand;
-            score.revives += 1;
+            if !coop {
+                score.revives += 1;
+            }
             leave_last_stand(lo);
+        } else if coop && h.revive_left <= 0.0 {
+            // Ausgeblutet: bis zur nächsten Runde zuschauen
+            h.downed = false;
+            h.dead = true;
+            p.frozen = true;
+            p.speed_mult = 1.0;
+            leave_last_stand(lo);
+            lo.state = WState::Busy { t: 0.0, dur: 1e9 };
         }
+        return;
+    }
+    if h.dead {
         return;
     }
     // Regeneration
@@ -142,4 +187,33 @@ pub fn player_health(
         h.heartbeat_cd = 1.0;
         sfx.write(SfxEvent::ui(Sfx::Heartbeat));
     }
+}
+
+/// Koop: Tote Spieler kehren zu Beginn der nächsten Runde mit der Startausrüstung zurück
+/// (ihre Punkte behalten sie).
+#[allow(clippy::too_many_arguments)]
+pub fn respawn_on_round(
+    mut events: MessageReader<RoundStarted>,
+    game: Res<InGame>,
+    map: Res<MapFile>,
+    session: Option<Res<Session>>,
+    mut q: Single<(&mut Player, &mut Health, &mut Transform, &mut Loadout)>,
+    mut sfx: MessageWriter<SfxEvent>,
+) {
+    if events.read().count() == 0 || !game.multiplayer {
+        return;
+    }
+    let (ref mut p, ref mut h, ref mut tf, ref mut lo) = *q;
+    if !h.dead {
+        return;
+    }
+    **h = Health::default();
+    p.frozen = false;
+    p.stance = Stance::Stand;
+    p.vel = Vec3::ZERO;
+    p.speed_mult = 1.0;
+    p.yaw = map.player_start.yaw;
+    tf.translation = super::spawn::spawn_point(&map, local_slot(session.as_deref()));
+    **lo = starting_loadout();
+    sfx.write(SfxEvent::ui(Sfx::Switch));
 }

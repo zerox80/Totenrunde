@@ -1,19 +1,20 @@
-//! Auswahl der Spawnpunkte: nur in der Zone des Spielers und angrenzenden offenen Zonen,
-//! Aufsteiger nicht zu nah am Spieler, nähere Spawner werden bevorzugt.
+//! Auswahl der Spawnpunkte: nur in den Zonen der Spieler und angrenzenden offenen Zonen,
+//! Aufsteiger nicht zu nah an einem Spieler, nähere Spawner werden bevorzugt.
 
 use bevy::prelude::*;
 use rand::Rng;
 
+use crate::game::survivors::Survivors;
 use crate::world::barricades::Barricades;
 use crate::world::mapdata::MapFile;
 use crate::world::zones::Zones;
 
-/// Wählt einen Spawner in einer aktiven Zone (Zone des Spielers + angrenzende offene Zonen).
+/// Wählt einen Spawner in einer aktiven Zone (Zonen der Spieler + angrenzende offene Zonen).
 pub fn pick_spawner(
     map: &MapFile,
     zones: &Zones,
     barricades: &Barricades,
-    ppos: Vec3,
+    survivors: &Survivors,
     rng: &mut impl Rng,
 ) -> Option<usize> {
     let active = zones.active_zones();
@@ -23,7 +24,7 @@ pub fn pick_spawner(
             continue;
         }
         let pos = Vec3::from_array(sp.pos);
-        let d = Vec3::new(pos.x - ppos.x, 0.0, pos.z - ppos.z).length();
+        let d = survivors.min_distance(pos);
         if sp.kind == "riser" {
             if d < 5.0 {
                 continue;

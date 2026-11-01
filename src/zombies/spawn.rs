@@ -50,6 +50,8 @@ pub struct ZombieSpawn {
     pub state: ZState,
     pub health: f32,
     pub class: SpeedClass,
+    /// Aussehen (Modell, Variante) vorgeben statt auslosen – für Zombies vom Host
+    pub look: Option<(usize, u8)>,
 }
 
 pub fn spawn_zombie(commands: &mut Commands, anims: &ZombieAnims, s: ZombieSpawn) -> Entity {
@@ -59,8 +61,13 @@ pub fn spawn_zombie(commands: &mut Commands, anims: &ZombieAnims, s: ZombieSpawn
         SpeedClass::Run => rng.random_range(2.3..2.9),
         SpeedClass::Sprint => rng.random_range(4.0..4.7),
     };
-    let variant = rng.random_range(0..35u8);
-    let model = rng.random_range(0..anims.models.len().max(1));
+    let (model, variant) = s.look.unwrap_or_else(|| {
+        (
+            rng.random_range(0..anims.models.len().max(1)),
+            rng.random_range(0..35u8),
+        )
+    });
+    let model = model.min(anims.models.len().saturating_sub(1));
     let z = commands
         .spawn((
             Name::new("Zombie"),

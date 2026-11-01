@@ -9,6 +9,7 @@
 //! * `game`    – Runden, Punkte, Perks, Power-ups, Kaufen, Kiste, Verstärker
 //! * `fx`      – Partikel, Decals, Feuer
 //! * `audio`   – Geräusche und Musik
+//! * `net`     – Koop-Multiplayer über den Totenrunde-Server
 //! * `ui`      – HUD und Menüs
 //!
 //! Alle 3D-Modelle, Texturen und HUD-Grafiken erzeugen die Blender-Skripte in `blender/`,
@@ -21,6 +22,7 @@ mod audio;
 mod base;
 mod fx;
 mod game;
+mod net;
 mod player;
 mod ui;
 mod weapons;
@@ -80,6 +82,7 @@ fn main() {
         zombies::ZombiePlugin,
         game::GamePlugin,
         fx::FxPlugin,
+        net::NetPlugin,
         ui::UiPlugin,
     ))
     .run();

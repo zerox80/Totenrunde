@@ -1,8 +1,8 @@
 //! Navigationsgitter und Flow-Field für die Zombies.
 //!
 //! Das begehbare Gebiet wird einmal aus den Kollisionsboxen gerastert. Ein Dijkstra-
-//! Flow-Field (8 Nachbarn) vom Spieler aus wird regelmäßig neu berechnet; jeder Zombie
-//! folgt dem fallenden Distanzwert.
+//! Flow-Field (8 Nachbarn) von allen Spielern aus wird regelmäßig neu berechnet; jeder
+//! Zombie folgt dem fallenden Distanzwert und läuft so zum nächsten Spieler.
 
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
@@ -27,7 +27,8 @@ pub struct NavGrid {
     pub walk: Vec<bool>,
     pub dist: Vec<u32>,
     pub zone_of: Vec<i8>,
-    pub goal_cell: Option<usize>,
+    /// Zielzellen des aktuellen Flow-Fields (leer: neu berechnen)
+    pub goal_cells: Vec<usize>,
     heap: BinaryHeap<Reverse<(u32, u32)>>,
 }
 
@@ -100,7 +101,7 @@ impl NavGrid {
             walk,
             dist: vec![UNREACHABLE; n],
             zone_of,
-            goal_cell: None,
+            goal_cells: Vec::new(),
             heap: BinaryHeap::new(),
         }
     }
@@ -112,7 +113,7 @@ impl NavGrid {
                 self.walk[i] = self.static_ok[i];
             }
         }
-        self.goal_cell = None;
+        self.goal_cells.clear();
     }
 
     #[inline]
@@ -173,16 +174,22 @@ impl NavGrid {
         None
     }
 
-    /// Berechnet das Flow-Field zum Ziel (Spielerposition) neu.
-    pub fn compute_flow(&mut self, goal: Vec3) {
-        let Some(start) = self.nearest_walkable(goal) else {
+    /// Berechnet das Flow-Field zu den Zielen (Spielerpositionen) neu.
+    pub fn compute_flow(&mut self, goals: &[Vec3]) {
+        let starts: Vec<usize> = goals
+            .iter()
+            .filter_map(|g| self.nearest_walkable(*g))
+            .collect();
+        if starts.is_empty() {
             return;
-        };
-        self.goal_cell = Some(start);
+        }
         self.dist.fill(UNREACHABLE);
         self.heap.clear();
-        self.dist[start] = 0;
-        self.heap.push(Reverse((0, start as u32)));
+        for &start in &starts {
+            self.dist[start] = 0;
+            self.heap.push(Reverse((0, start as u32)));
+        }
+        self.goal_cells = starts;
         let w = self.w as i32;
         let h = self.h as i32;
         const N: [(i32, i32, u32); 8] = [

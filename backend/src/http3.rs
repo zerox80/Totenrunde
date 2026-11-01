@@ -53,6 +53,7 @@ async fn accept_connections(endpoint: &Endpoint, app: Router) {
 }
 
 async fn serve_connection(connection: quinn::Connection, app: Router) {
+    let peer = totenrunde_mp_server::PeerAddr(connection.remote_address().ip());
     let mut connection =
         match h3::server::Connection::new(h3_quinn::Connection::new(connection)).await {
             Ok(connection) => connection,
@@ -67,7 +68,7 @@ async fn serve_connection(connection: quinn::Connection, app: Router) {
             Ok(Some(resolver)) => {
                 let app = app.clone();
                 tokio::spawn(async move {
-                    if let Err(error) = handle_request(resolver, app).await {
+                    if let Err(error) = handle_request(resolver, app, peer).await {
                         eprintln!("HTTP/3-Anfrage fehlgeschlagen: {error}");
                     }
                 });
@@ -83,7 +84,11 @@ async fn serve_connection(connection: quinn::Connection, app: Router) {
     }
 }
 
-async fn handle_request<C>(resolver: RequestResolver<C, Bytes>, app: Router) -> Result<(), DynError>
+async fn handle_request<C>(
+    resolver: RequestResolver<C, Bytes>,
+    app: Router,
+    peer: totenrunde_mp_server::PeerAddr,
+) -> Result<(), DynError>
 where
     C: h3::quic::Connection<Bytes>,
 {
@@ -93,7 +98,8 @@ where
     let mut response = if too_large {
         StatusCode::PAYLOAD_TOO_LARGE.into_response()
     } else {
-        let request = axum::http::Request::from_parts(parts, Body::from(body));
+        let mut request = axum::http::Request::from_parts(parts, Body::from(body));
+        request.extensions_mut().insert(peer);
         app.oneshot(request).await?
     };
 
@@ -197,7 +203,7 @@ mod tests {
     use tokio::sync::oneshot;
 
     use super::{request_once, run_server, server_endpoint};
-    use crate::{router, tls};
+    use crate::{tests::router, tls};
 
     static NEXT_TEMP_DIR: AtomicU64 = AtomicU64::new(0);
 

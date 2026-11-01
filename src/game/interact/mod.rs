@@ -1,5 +1,6 @@
 //! Interaktion mit der Welt (Taste F): Wandwaffen, Türen und Schutt, Perk-Automaten,
-//! Stromschalter, Mysteriöse Kiste, Waffen-Verstärker und Barrikaden reparieren.
+//! Stromschalter, Mysteriöse Kiste, Waffen-Verstärker, Barrikaden reparieren und im Koop
+//! Mitspieler wiederbeleben.
 //!
 //! Ein zentrales System wählt das Objekt, auf das der Spieler schaut und das in Reichweite
 //! ist (`Focus`). Jedes Modul schreibt dann seinen Hinweistext (`Prompt`) und reagiert auf F.
@@ -10,6 +11,7 @@ pub mod pap;
 pub mod perks;
 pub mod power;
 pub mod repair;
+pub mod revive;
 pub mod wallbuy;
 
 use bevy::prelude::*;
@@ -19,6 +21,8 @@ use crate::base::debug::DebugConfig;
 use crate::base::{AppState, GameSet, InGame};
 use crate::game::perks::Perk;
 use crate::game::points::Score;
+use crate::game::requests;
+use crate::net::is_authority;
 use crate::player::{Health, Player};
 
 pub struct InteractPlugin;
@@ -51,7 +55,10 @@ impl Plugin for InteractPlugin {
                         mystery_box::use_box,
                         pap::use_pap,
                         repair::use_repair,
+                        revive::use_revive,
                     ),
+                    requests::handle_requests.run_if(is_authority),
+                    requests::apply_grants,
                 )
                     .chain()
                     .in_set(GameSet::World)
@@ -62,7 +69,7 @@ impl Plugin for InteractPlugin {
                 Update,
                 (
                     power::animate_power_switch,
-                    mystery_box::animate_box,
+                    (mystery_box::animate_box, mystery_box::box_sounds).chain(),
                     pap::animate_pap,
                     wallbuy::chalk_glow,
                 )
@@ -83,6 +90,8 @@ pub enum InteractKind {
     MysteryBox,
     PackAPunch,
     Barricade(usize),
+    /// Niedergestreckter Mitspieler (Platz)
+    Revive(u8),
 }
 
 /// Benutzbares Objekt: Punkt in der Welt, Reichweite, optional die Seite, von der aus es

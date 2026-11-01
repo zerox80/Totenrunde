@@ -1,4 +1,4 @@
-//! Hauptmenü: Titel, "Spielen" und "Beenden" (Enter / Esc).
+//! Hauptmenü: Titel, "Spielen", "Multiplayer" und "Beenden" (Enter / Esc).
 
 use bevy::prelude::*;
 
@@ -45,6 +45,12 @@ fn spawn(mut commands: Commands, assets: Res<GameAssets>, lib: Option<Res<crate:
                 },
             ));
             button(p, "menu.play", MenuAction::Play, &assets.font_bold);
+            button(
+                p,
+                "menu.multiplayer",
+                MenuAction::Multiplayer,
+                &assets.font_bold,
+            );
             super::graphics::open_button(p, &assets.font_bold);
             button(p, "menu.quit", MenuAction::Quit, &assets.font_bold);
             p.spawn((
@@ -74,6 +80,11 @@ fn keys(
         if keys.just_pressed(KeyCode::Escape) {
             gfx.0 = false;
         }
+        return;
+    }
+    // Automatische Koop-Tests (TR_MP) gehen direkt ins Multiplayer-Menü
+    if std::env::var_os("TR_MP").is_some() {
+        next.set(AppState::Multiplayer);
         return;
     }
     if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::Space) {

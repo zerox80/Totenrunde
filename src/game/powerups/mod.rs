@@ -3,7 +3,10 @@
 //! Drop-Logik wie im Original: Sobald die insgesamt verdienten Punkte eine steigende
 //! Schwelle (2000, x1.14) überschreiten, lässt der nächste getötete Zombie ein Power-up
 //! fallen; zusätzlich 2 % Zufall. Höchstens 4 Drops pro Runde. Solo: Schwelle 1500 (x1.1)
-//! und 5 % Zufall (siehe `balance`).
+//! und 5 % Zufall (siehe `balance`). Im Koop zählen die Punkte aller Spieler.
+//!
+//! Fallen lassen, Einsammeln und die Wirkung auf die Welt berechnet der Host; Ansage, Max.
+//! Munition und die Punkte für Atombombe und Zimmermann bekommt jeder Spieler selbst.
 
 pub mod drops;
 pub mod effects;
@@ -13,6 +16,7 @@ use rand::seq::SliceRandom;
 
 use crate::base::{AppState, GameSet, InGame};
 use crate::game::balance::Balance;
+use crate::net::is_authority;
 
 pub use drops::spawn_powerup;
 
@@ -26,11 +30,12 @@ impl Plugin for PowerupPlugin {
             .add_systems(
                 Update,
                 (
-                    drops::drop_powerups,
+                    drops::drop_powerups.run_if(is_authority),
                     drops::animate_powerups,
-                    effects::collect_powerups,
+                    effects::collect_powerups.run_if(is_authority),
+                    effects::powerup_feedback,
                     effects::tick_powerups,
-                    effects::nuke_sequence,
+                    effects::nuke_sequence.run_if(is_authority),
                 )
                     .chain()
                     .in_set(GameSet::World)
@@ -55,6 +60,23 @@ pub enum PowerupKind {
 }
 
 impl PowerupKind {
+    pub const ALL: [PowerupKind; 6] = [
+        PowerupKind::MaxAmmo,
+        PowerupKind::InstaKill,
+        PowerupKind::DoublePoints,
+        PowerupKind::Nuke,
+        PowerupKind::Carpenter,
+        PowerupKind::FireSale,
+    ];
+
+    pub fn index(self) -> u8 {
+        Self::ALL.iter().position(|k| *k == self).unwrap_or(0) as u8
+    }
+
+    pub fn from_index(i: u8) -> Option<Self> {
+        Self::ALL.get(i as usize).copied()
+    }
+
     pub fn name(self) -> &'static str {
         match self {
             PowerupKind::MaxAmmo => "Max. Munition",
@@ -99,9 +121,11 @@ pub struct Powerup {
     pub base: Vec3,
 }
 
+/// Ein Power-up wurde eingesammelt (von Platz `by`); gilt für alle Spieler.
 #[derive(Message, Clone, Copy)]
 pub struct PowerupCollected {
     pub kind: PowerupKind,
+    pub by: u8,
 }
 
 fn shuffled_cycle() -> Vec<PowerupKind> {

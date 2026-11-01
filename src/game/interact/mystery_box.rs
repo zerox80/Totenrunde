@@ -2,19 +2,26 @@
 //! die angebotene Waffe kann 12 Sekunden lang genommen werden. Nach einigen Benutzungen
 //! erscheint ein Teddy – die Kiste lacht, fliegt davon und taucht an einem anderen Ort
 //! wieder auf (die Punkte gibt es zurück). Ein Lichtstrahl zeigt, wo sie steht.
+//!
+//! Die Kiste gehört allen: Öffnen und Nehmen sind Anfragen an den Host (siehe `requests`),
+//! nur er wechselt die Phasen. Die angebotene Waffe kann nur nehmen, wer bezahlt hat.
+//! Gäste übernehmen Phase und Ort aus dem Schnappschuss und spielen nur die Bewegung ab.
 
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
 use rand::Rng;
 
-use super::{Focus, InteractKind, Interactable, Prompt, cost_text, try_buy};
+use super::{Focus, InteractKind, Interactable, Prompt, cost_text};
 use crate::audio::{Sfx, SfxEvent};
 use crate::base::AppState;
 use crate::base::i18n::tf;
 use crate::game::points::Score;
 use crate::game::powerups::ActivePowerups;
-use crate::weapons::{GiveWeapon, Loadout, WEAPONS, def};
+use crate::game::requests::WorldRequest;
+use crate::net::msg::Req;
+use crate::net::{Session, local_slot};
+use crate::weapons::{Loadout, WEAPONS, def};
 use crate::world::mapdata::{MapFile, asset_exists};
 
 pub const BOX_COST: u32 = 950;
@@ -25,10 +32,36 @@ const OFFER_TIME: f32 = 12.0;
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum BoxPhase {
     Closed,
-    Rolling { t: f32, weapon: usize, next: f32 },
-    Offer { t: f32, weapon: usize },
-    Teddy { t: f32 },
-    Away { t: f32 },
+    /// `weapon` = `usize::MAX`: Teddy; `owner`: Platz des Spielers, der bezahlt hat
+    Rolling {
+        t: f32,
+        weapon: usize,
+        next: f32,
+        owner: u8,
+    },
+    Offer {
+        t: f32,
+        weapon: usize,
+        owner: u8,
+    },
+    Teddy {
+        t: f32,
+    },
+    Away {
+        t: f32,
+    },
+}
+
+impl BoxPhase {
+    fn kind(self) -> u8 {
+        match self {
+            BoxPhase::Closed => 0,
+            BoxPhase::Rolling { .. } => 1,
+            BoxPhase::Offer { .. } => 2,
+            BoxPhase::Teddy { .. } => 3,
+            BoxPhase::Away { .. } => 4,
+        }
+    }
 }
 
 #[derive(Resource)]
@@ -204,11 +237,11 @@ pub fn spawn_box(
 }
 
 /// Zufallswaffe nach Gewichten, ohne Waffen, die der Spieler schon trägt.
-fn roll_weapon(lo: &Loadout, rng: &mut impl Rng) -> usize {
+fn roll_weapon(owned: &[usize], rng: &mut impl Rng) -> usize {
     let cands: Vec<(usize, f32)> = WEAPONS
         .iter()
         .enumerate()
-        .filter(|(i, w)| w.box_weight > 0.0 && lo.has(*i).is_none())
+        .filter(|(i, w)| w.box_weight > 0.0 && !owned.contains(i))
         .map(|(i, w)| (i, w.box_weight))
         .collect();
     let total: f32 = cands.iter().map(|c| c.1).sum();
@@ -235,73 +268,91 @@ fn any_weapon(rng: &mut impl Rng) -> usize {
     c[rng.random_range(0..c.len())]
 }
 
+/// Kiste öffnen (Host): Waffe auslosen oder Teddy. Liefert die Kosten und ob es der Teddy
+/// war (dann wird nichts bezahlt).
+pub fn open_box(mbox: &mut MysteryBox, owned: &[usize], fire_sale: bool, owner: u8) -> (u32, bool) {
+    let mut rng = rand::rng();
+    let cost = if fire_sale { FIRE_SALE_COST } else { BOX_COST };
+    let teddy_chance = if fire_sale || mbox.uses < 4 {
+        0.0
+    } else {
+        (0.12 + 0.05 * (mbox.uses - 4) as f32).min(0.5)
+    };
+    mbox.uses += 1;
+    // Teddy: erst normal rollen, dann statt einer Waffe der Teddy (Punkte zurück)
+    let teddy = rng.random::<f32>() < teddy_chance;
+    mbox.phase = BoxPhase::Rolling {
+        t: 0.0,
+        weapon: if teddy {
+            usize::MAX
+        } else {
+            roll_weapon(owned, &mut rng)
+        },
+        next: 0.0,
+        owner,
+    };
+    (cost, teddy)
+}
+
+/// Angebotene Waffe nehmen (Host): nur wer bezahlt hat.
+pub fn take_offer(mbox: &mut MysteryBox, by: u8) -> Option<usize> {
+    match mbox.phase {
+        BoxPhase::Offer { weapon, owner, .. } if owner == by => {
+            mbox.phase = BoxPhase::Closed;
+            Some(weapon)
+        }
+        _ => None,
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn use_box(
     mut focus: ResMut<Focus>,
     mut prompt: ResMut<Prompt>,
-    mbox: Option<ResMut<MysteryBox>>,
-    mut score: ResMut<Score>,
+    mbox: Option<Res<MysteryBox>>,
+    score: Res<Score>,
     pu: Res<ActivePowerups>,
     lo: Single<&Loadout>,
-    tfs: Query<&Transform>,
-    mut give: MessageWriter<GiveWeapon>,
+    session: Option<Res<Session>>,
+    mut requests: MessageWriter<WorldRequest>,
     mut sfx: MessageWriter<SfxEvent>,
 ) {
-    let Some(mut mbox) = mbox else { return };
+    let Some(mbox) = mbox else { return };
     if focus.kind != Some(InteractKind::MysteryBox) {
         return;
     }
-    let pos = tfs
-        .get(mbox.root)
-        .map(|t| t.translation)
-        .unwrap_or_default()
-        + Vec3::Y * 0.6;
-    let fire_sale = pu.fire_sale > 0.0;
+    let me = local_slot(session.as_deref());
     match mbox.phase {
         BoxPhase::Closed => {
-            let cost = if fire_sale { FIRE_SALE_COST } else { BOX_COST };
+            let cost = if pu.fire_sale > 0.0 {
+                FIRE_SALE_COST
+            } else {
+                BOX_COST
+            };
             prompt.set(tf("prompt.box", &[("cost", &cost_text(cost))]));
-            if focus.pressed && try_buy(&mut score, cost, &mut sfx) {
-                let mut rng = rand::rng();
-                let teddy_chance = if fire_sale || mbox.uses < 4 {
-                    0.0
+            if focus.pressed {
+                if score.points >= cost {
+                    let owned = lo.slots.iter().map(|s| s.weapon as u8).collect();
+                    requests.write(WorldRequest {
+                        by: me,
+                        req: Req::BoxOpen { owned },
+                    });
                 } else {
-                    (0.12 + 0.05 * (mbox.uses - 4) as f32).min(0.5)
-                };
-                mbox.uses += 1;
-                sfx.write(SfxEvent::at(Sfx::BoxOpen, pos));
-                sfx.write(SfxEvent::at(Sfx::BoxMusic, pos));
-                if rng.random::<f32>() < teddy_chance {
-                    // Teddy: erst normal rollen, dann statt einer Waffe der Teddy
-                    mbox.phase = BoxPhase::Rolling {
-                        t: 0.0,
-                        weapon: usize::MAX,
-                        next: 0.0,
-                    };
-                    score.points += cost; // wie im Original: Punkte zurück
-                    score.pending_popups.push(cost as i64);
-                } else {
-                    mbox.phase = BoxPhase::Rolling {
-                        t: 0.0,
-                        weapon: roll_weapon(&lo, &mut rng),
-                        next: 0.0,
-                    };
+                    sfx.write(SfxEvent::ui(Sfx::Deny));
                 }
                 focus.pressed = false;
             }
         }
-        BoxPhase::Offer { weapon, .. } => {
+        BoxPhase::Offer { weapon, owner, .. } if owner == me => {
             prompt.set(tf(
                 "prompt.take",
                 &[("item", &def(weapon).display_name(false))],
             ));
             if focus.pressed {
-                give.write(GiveWeapon {
-                    weapon,
-                    upgraded: false,
+                requests.write(WorldRequest {
+                    by: me,
+                    req: Req::BoxTake,
                 });
-                mbox.phase = BoxPhase::Closed;
-                sfx.write(SfxEvent::at(Sfx::BoxClose, pos));
                 focus.pressed = false;
             }
         }
@@ -309,6 +360,78 @@ pub fn use_box(
     }
 }
 
+/// Geräusche bei jedem Phasenwechsel (beim Host wie bei den Gästen).
+pub fn box_sounds(
+    mbox: Option<Res<MysteryBox>>,
+    tfs: Query<&Transform>,
+    mut last: Local<u8>,
+    mut sfx: MessageWriter<SfxEvent>,
+) {
+    let Some(mbox) = mbox else { return };
+    let kind = mbox.phase.kind();
+    if kind == *last {
+        return;
+    }
+    let pos = tfs
+        .get(mbox.root)
+        .map(|t| t.translation)
+        .unwrap_or_default()
+        + Vec3::Y * 0.6;
+    match (*last, kind) {
+        (_, 1) => {
+            sfx.write(SfxEvent::at(Sfx::BoxOpen, pos));
+            sfx.write(SfxEvent::at(Sfx::BoxMusic, pos));
+        }
+        (2, 0) => {
+            sfx.write(SfxEvent::at(Sfx::BoxClose, pos));
+        }
+        (_, 3) => {
+            sfx.write(SfxEvent::at(Sfx::BoxLaugh, pos + Vec3::Y * 0.4));
+        }
+        (_, 4) => {
+            sfx.write(SfxEvent::at(Sfx::BoxMove, pos + Vec3::Y * 0.4));
+        }
+        _ => {}
+    }
+    *last = kind;
+}
+
+/// Kiste an ihren Platz stellen: Lichtstrahl sichtbar, Benutzungspunkt davor.
+fn settle(
+    mbox: &MysteryBox,
+    tf: &Transform,
+    tfs: &mut Query<&mut Transform>,
+    vis: &mut Query<&mut Visibility>,
+    items: &mut Query<&mut Interactable>,
+) {
+    if let Ok(mut rt) = tfs.get_mut(mbox.root)
+        && (rt.translation != tf.translation || rt.rotation != tf.rotation)
+    {
+        rt.translation = tf.translation;
+        rt.rotation = tf.rotation;
+    }
+    let beam = tf.translation + Vec3::Y * 21.6;
+    if let Ok(mut bt) = tfs.get_mut(mbox.beam)
+        && bt.translation != beam
+    {
+        bt.translation = beam;
+    }
+    if let Ok(mut v) = vis.get_mut(mbox.beam)
+        && *v != Visibility::Inherited
+    {
+        *v = Visibility::Inherited;
+    }
+    if let Ok(mut it) = items.get_mut(mbox.interact) {
+        let (p, f) = interact_point(tf);
+        if it.point != p {
+            it.point = p;
+            it.facing = Some(f);
+        }
+    }
+}
+
+/// Bewegung der Kiste. Phasen wechselt nur, wer die Welt berechnet (`authority`); bei Gästen
+/// läuft die Zeit innerhalb der Phase weiter, bis der Schnappschuss die nächste bringt.
 #[allow(clippy::too_many_arguments)]
 pub fn animate_box(
     mut commands: Commands,
@@ -316,65 +439,86 @@ pub fn animate_box(
     map: Res<MapFile>,
     mbox: Option<ResMut<MysteryBox>>,
     asset_server: Res<AssetServer>,
+    session: Option<Res<Session>>,
     mut tfs: Query<&mut Transform>,
     mut vis: Query<&mut Visibility>,
     mut items: Query<&mut Interactable>,
     mut pu: ResMut<ActivePowerups>,
-    mut sfx: MessageWriter<SfxEvent>,
 ) {
     let Some(mut mbox) = mbox else { return };
+    let authority = session.is_none_or(|s| s.is_host());
     let dt = time.delta_secs();
     let mut rng = rand::rng();
-    let root_tf = tfs.get(mbox.root).map(|t| *t).unwrap_or_default();
-    let base = root_tf.translation;
+    // Gäste bleiben kurz vor dem Phasenende stehen
+    let hold = |t: f32, end: f32| if authority { t } else { t.min(end - 1e-3) };
     let mut lid_open = 0.0;
     let mut display_h: Option<f32> = None;
     let mut want_weapon: Option<usize> = None;
     match mbox.phase {
-        BoxPhase::Closed => {}
-        BoxPhase::Rolling { t, weapon, next } => {
-            let t = t + dt;
+        BoxPhase::Closed => {
+            let tf = spot_transform(&map, mbox.spot);
+            settle(&mbox, &tf, &mut tfs, &mut vis, &mut items);
+            if let Ok(mut v) = vis.get_mut(mbox.teddy)
+                && *v != Visibility::Hidden
+            {
+                *v = Visibility::Hidden;
+            }
+        }
+        BoxPhase::Rolling {
+            t,
+            weapon,
+            next,
+            owner,
+        } => {
+            let t = hold(t + dt, ROLL_TIME);
             lid_open = (t / 0.4).min(1.0);
             display_h = Some(0.35 + 0.6 * (t / ROLL_TIME).min(1.0));
             let mut next = next - dt;
-            let mut current = mbox.display.and_then(|e| tfs.get(e).ok()).map(|_| ());
-            if next <= 0.0 || current.is_none() {
+            if next <= 0.0 || mbox.display.is_none_or(|e| tfs.get(e).is_err()) {
                 // Waffen wechseln immer langsamer
                 next = 0.06 + 0.4 * (t / ROLL_TIME).powi(2);
                 want_weapon = Some(any_weapon(&mut rng));
-                current = None;
             }
-            let _ = current;
             if t >= ROLL_TIME {
                 if weapon == usize::MAX {
                     mbox.phase = BoxPhase::Teddy { t: 0.0 };
-                    sfx.write(SfxEvent::at(Sfx::BoxLaugh, base + Vec3::Y));
                     if let Some(d) = mbox.display.take() {
                         commands.entity(d).despawn();
                     }
                 } else {
-                    mbox.phase = BoxPhase::Offer { t: 0.0, weapon };
+                    mbox.phase = BoxPhase::Offer {
+                        t: 0.0,
+                        weapon,
+                        owner,
+                    };
                     want_weapon = Some(weapon);
                 }
             } else {
-                mbox.phase = BoxPhase::Rolling { t, weapon, next };
+                mbox.phase = BoxPhase::Rolling {
+                    t,
+                    weapon,
+                    next,
+                    owner,
+                };
             }
         }
-        BoxPhase::Offer { t, weapon } => {
-            let t = t + dt;
+        BoxPhase::Offer { t, weapon, owner } => {
+            let t = hold(t + dt, OFFER_TIME);
             lid_open = 1.0;
             // Waffe sinkt in den letzten Sekunden zurück in die Kiste
             let sink = ((t - (OFFER_TIME - 2.0)) / 2.0).clamp(0.0, 1.0);
             display_h = Some(0.95 - 0.6 * sink);
+            if mbox.display.is_none_or(|e| tfs.get(e).is_err()) {
+                want_weapon = Some(weapon);
+            }
             if t >= OFFER_TIME {
                 mbox.phase = BoxPhase::Closed;
-                sfx.write(SfxEvent::at(Sfx::BoxClose, base + Vec3::Y * 0.5));
             } else {
-                mbox.phase = BoxPhase::Offer { t, weapon };
+                mbox.phase = BoxPhase::Offer { t, weapon, owner };
             }
         }
         BoxPhase::Teddy { t } => {
-            let t = t + dt;
+            let t = hold(t + dt, 2.6);
             lid_open = 1.0;
             if let Ok(mut tt) = tfs.get_mut(mbox.teddy) {
                 tt.translation = Vec3::new(0.0, 0.3 + 0.7 * (t / 1.0).min(1.0), 0.0);
@@ -385,7 +529,6 @@ pub fn animate_box(
             }
             if t >= 2.6 {
                 mbox.phase = BoxPhase::Away { t: 0.0 };
-                sfx.write(SfxEvent::at(Sfx::BoxMove, base + Vec3::Y));
                 if let Ok(mut v) = vis.get_mut(mbox.teddy) {
                     *v = Visibility::Hidden;
                 }
@@ -394,29 +537,35 @@ pub fn animate_box(
             }
         }
         BoxPhase::Away { t } => {
-            let t = t + dt;
+            let t = hold(t + dt, 3.3);
+            if let Ok(mut v) = vis.get_mut(mbox.teddy) {
+                *v = Visibility::Hidden;
+            }
             // hochfliegen, verschwinden, an neuem Ort wieder herabkommen
             if t < 2.0 {
                 if let Ok(mut rt) = tfs.get_mut(mbox.root) {
                     let k = t / 2.0;
-                    rt.translation.y = map.box_spots[mbox.spot].pos[1] + k * k * 6.0;
-                    rt.rotation = Quat::from_rotation_y(map.box_spots[mbox.spot].yaw + k * k * 8.0);
+                    let from = &map.box_spots[mbox.spot];
+                    rt.translation = Vec3::from_array(from.pos) + Vec3::Y * k * k * 6.0;
+                    rt.rotation = Quat::from_rotation_y(from.yaw + k * k * 8.0);
                 }
                 if let Ok(mut v) = vis.get_mut(mbox.beam) {
                     *v = Visibility::Hidden;
                 }
             } else if t < 2.1 {
-                // neuen Ort wählen
-                let n = map.box_spots.len();
-                if n > 1 {
-                    let mut ns = mbox.spot;
-                    while ns == mbox.spot {
-                        ns = rng.random_range(0..n);
+                // neuen Ort wählen (nur der Host; Gäste bekommen ihn mit dem Schnappschuss)
+                if authority && mbox.uses > 0 {
+                    let n = map.box_spots.len();
+                    if n > 1 {
+                        let mut ns = mbox.spot;
+                        while ns == mbox.spot {
+                            ns = rng.random_range(0..n);
+                        }
+                        mbox.spot = ns;
                     }
-                    mbox.spot = ns;
+                    mbox.uses = 0;
+                    pu.fire_sale_allowed = true;
                 }
-                mbox.uses = 0;
-                pu.fire_sale_allowed = true;
             } else {
                 let tf = spot_transform(&map, mbox.spot);
                 let k = ((t - 2.1) / 1.2).min(1.0);
@@ -424,18 +573,7 @@ pub fn animate_box(
                     rt.translation = tf.translation + Vec3::Y * (1.0 - k) * (1.0 - k) * 6.0;
                     rt.rotation = tf.rotation;
                 }
-                if let Ok(mut bt) = tfs.get_mut(mbox.beam) {
-                    bt.translation = tf.translation + Vec3::Y * 21.6;
-                }
                 if k >= 1.0 {
-                    if let Ok(mut v) = vis.get_mut(mbox.beam) {
-                        *v = Visibility::Inherited;
-                    }
-                    if let Ok(mut it) = items.get_mut(mbox.interact) {
-                        let (p, f) = interact_point(&tf);
-                        it.point = p;
-                        it.facing = Some(f);
-                    }
                     mbox.phase = BoxPhase::Closed;
                 }
             }

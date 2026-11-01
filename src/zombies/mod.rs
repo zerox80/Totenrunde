@@ -11,6 +11,7 @@ pub mod steering;
 use bevy::prelude::*;
 
 use crate::base::{AppState, GameSet, InGame};
+use crate::net::is_authority;
 
 pub use hitbox::{RayZombieHit, raycast_zombies};
 pub use spawn::{ZombieSpawn, spawn_zombie};
@@ -29,12 +30,18 @@ impl Plugin for ZombiePlugin {
             .init_resource::<spawn::ZombieMats>()
             .add_systems(Startup, blob::setup)
             .add_systems(Update, blob::attach)
+            // Die KI läuft nur dort, wo die Welt berechnet wird (Solo oder Host); Gäste
+            // bekommen die Zombies vom Host und animieren sie nur.
             .add_systems(
                 Update,
                 (
-                    steering::update_flow,
-                    ai::zombie_ai,
-                    steering::zombie_separation,
+                    (
+                        steering::update_flow,
+                        ai::zombie_ai,
+                        steering::zombie_separation,
+                    )
+                        .chain()
+                        .run_if(is_authority),
                     anim::animate_zombies,
                 )
                     .chain()
@@ -49,7 +56,8 @@ impl Plugin for ZombiePlugin {
                     .in_set(GameSet::Combat)
                     .after(crate::weapons::WeaponSystems)
                     .run_if(in_state(AppState::Playing))
-                    .run_if(resource_exists::<InGame>),
+                    .run_if(resource_exists::<InGame>)
+                    .run_if(is_authority),
             );
     }
 }
@@ -168,9 +176,21 @@ pub struct ZombieRig {
     pub stump_mesh: Option<Entity>,
 }
 
+/// Wer einen Treffer verursacht hat (bekommt die Punkte).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Attacker {
+    /// Der Spieler an diesem Rechner
+    Local,
+    /// Ein Mitspieler (Platz), dessen Treffer der Host auswertet
+    Remote(u8),
+    /// Niemand (Atombombe)
+    World,
+}
+
 #[derive(Message)]
 pub struct ZombieHit {
     pub zombie: Entity,
+    pub by: Attacker,
     pub damage: f32,
     pub part: HitPart,
     pub kind: DamageKind,

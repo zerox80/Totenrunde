@@ -11,18 +11,33 @@ use bevy::render::view::{ColorGrading, ColorGradingGlobal, ColorGradingSection};
 use super::{CameraFov, Health, Player, PlayerCamera, Stance};
 use crate::base::AppState;
 use crate::base::settings::Settings;
+use crate::net::{Session, local_slot};
 use crate::world::mapdata::MapFile;
+
+/// Startpunkt eines Spielers: im Koop nebeneinander statt übereinander.
+pub fn spawn_point(map: &MapFile, slot: u8) -> Vec3 {
+    let start = &map.player_start;
+    let offset = match slot % 4 {
+        0 => Vec3::ZERO,
+        1 => Vec3::new(1.2, 0.0, 0.0),
+        2 => Vec3::new(-1.2, 0.0, 0.0),
+        _ => Vec3::new(0.0, 0.0, 1.2),
+    };
+    start.pos() + Quat::from_rotation_y(start.yaw) * offset
+}
 
 pub fn spawn_player(
     mut commands: Commands,
     map: Res<MapFile>,
     settings: Res<Settings>,
+    session: Option<Res<Session>>,
     existing: Query<(), With<Player>>,
 ) {
     if !existing.is_empty() {
         return;
     }
     let start = map.player_start.clone();
+    let pos = spawn_point(&map, local_slot(session.as_deref()));
     let fov = settings.fov_deg.to_radians();
     commands
         .spawn((
@@ -32,8 +47,7 @@ pub fn spawn_player(
                 ..default()
             },
             Health::default(),
-            Transform::from_translation(start.pos())
-                .with_rotation(Quat::from_rotation_y(start.yaw)),
+            Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(start.yaw)),
             Visibility::default(),
             DespawnOnExit(AppState::Playing),
         ))

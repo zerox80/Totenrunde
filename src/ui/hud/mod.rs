@@ -3,6 +3,7 @@
 //!   * unten rechts: Punkte mit aufsteigenden Änderungen, Munition, Granaten, Waffenname
 //!   * unten Mitte: aktive Power-ups mit Restzeit, darüber der Hinweistext (Taste F)
 //!   * roter Bildschirmrand bei Schaden, Fadenkreuz, Fernrohrbild, FPS-Anzeige (F3)
+//!   * Koop: Punkte der Mitspieler, Meldungen, Hinweis am Boden
 
 mod ammo;
 mod damage;
@@ -11,6 +12,7 @@ mod powerups;
 mod prompt;
 mod round;
 mod scope;
+mod team;
 mod widgets;
 
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
@@ -36,6 +38,7 @@ impl Plugin for HudPlugin {
                     prompt::spawn,
                     damage::spawn,
                     scope::spawn,
+                    team::spawn,
                 ),
             )
             .add_systems(
@@ -52,6 +55,8 @@ impl Plugin for HudPlugin {
                     damage::update,
                     scope::update,
                     crosshair_visibility,
+                    (team::update_team, team::update_notices, team::update_downed)
+                        .run_if(crate::net::in_session),
                 )
                     .in_set(GameSet::Ui)
                     .run_if(in_state(AppState::Playing))

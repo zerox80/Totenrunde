@@ -1,13 +1,15 @@
-//! Türen und Schutthaufen kaufen.
+//! Türen und Schutthaufen kaufen (Anfrage an den Host, siehe `requests`).
 
 use bevy::prelude::*;
 
-use super::{Focus, InteractKind, Interactable, Prompt, cost_text, try_buy};
-use crate::audio::SfxEvent;
+use super::{Focus, InteractKind, Interactable, Prompt, cost_text};
+use crate::audio::{Sfx, SfxEvent};
 use crate::base::AppState;
 use crate::base::i18n::tf;
 use crate::game::points::Score;
-use crate::world::doors::OpenDoor;
+use crate::game::requests::WorldRequest;
+use crate::net::msg::Req;
+use crate::net::{Session, local_slot};
 use crate::world::mapdata::MapFile;
 use crate::world::zones::Zones;
 
@@ -45,10 +47,11 @@ pub fn use_door(
     mut commands: Commands,
     mut focus: ResMut<Focus>,
     mut prompt: ResMut<Prompt>,
-    mut score: ResMut<Score>,
+    score: Res<Score>,
     zones: Res<Zones>,
     doors: Query<(Entity, &DoorPrompt)>,
-    mut open: MessageWriter<OpenDoor>,
+    session: Option<Res<Session>>,
+    mut requests: MessageWriter<WorldRequest>,
     mut sfx: MessageWriter<SfxEvent>,
 ) {
     // Bereits geöffnete Türen nicht mehr anbieten
@@ -71,9 +74,15 @@ pub fn use_door(
         "prompt.door"
     };
     prompt.set(tf(key, &[("cost", &cost_text(d.cost))]));
-    if focus.pressed && try_buy(&mut score, d.cost, &mut sfx) {
-        open.write(OpenDoor(id));
-        score.doors += 1;
+    if focus.pressed {
+        if score.points >= d.cost {
+            requests.write(WorldRequest {
+                by: local_slot(session.as_deref()),
+                req: Req::Door(id),
+            });
+        } else {
+            sfx.write(SfxEvent::ui(Sfx::Deny));
+        }
         focus.pressed = false;
     }
 }

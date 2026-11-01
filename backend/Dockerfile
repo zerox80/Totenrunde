@@ -29,7 +29,8 @@ RUN apt-get update \
     && apt-get install --yes --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 app \
-    && useradd --uid 10001 --gid app --no-create-home app
+    && useradd --uid 10001 --gid app --no-create-home app \
+    && mkdir /data && chown app:app /data
 WORKDIR /app
 COPY --from=backend-builder --chown=app:app /build/backend/target/release/totenrunde-web /app/totenrunde-web
 COPY --from=wasm-builder --chown=app:app /web/pkg /app/web/pkg
@@ -37,7 +38,9 @@ COPY --chown=app:app backend/web/ /app/web/
 COPY --chown=app:app assets/ /app/assets/
 COPY --chown=app:app LICENSE /app/LICENSE
 USER app
-ENV HOST=0.0.0.0 PORT=8443 WEB_ROOT=/app/web ASSET_ROOT=/app/assets \
+# Konten und Statistik (SQLite) liegen in /data, das als Volume erhalten bleibt
+VOLUME /data
+ENV HOST=0.0.0.0 PORT=8443 WEB_ROOT=/app/web ASSET_ROOT=/app/assets DATA_DIR=/data \
     TLS_CERT_PATH=/certs/fullchain.pem TLS_KEY_PATH=/certs/privkey.pem \
     TLS_SERVER_NAME=localhost
 EXPOSE 8443/tcp 8443/udp

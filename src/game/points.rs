@@ -53,6 +53,13 @@ impl Score {
         amount
     }
 
+    /// Fertig berechnete Punkte gutschreiben (vom Host, Doppelte Punkte schon enthalten).
+    pub fn add_final(&mut self, amount: u32) {
+        self.points += amount;
+        self.earned += amount as u64;
+        self.pending_popups.push(amount as i64);
+    }
+
     /// Versucht, `cost` Punkte auszugeben.
     pub fn spend(&mut self, cost: u32) -> bool {
         if self.points >= cost {

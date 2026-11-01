@@ -1,11 +1,14 @@
 //! HTTPS über TCP (HTTP/1.1 und HTTP/2). Browser bauen zu einer unbekannten Seite
 //! immer zuerst eine TCP-Verbindung auf und wechseln erst nach dem `Alt-Svc`-Header
 //! auf HTTP/3; ohne diesen Zugang wäre der QUIC-Server im Browser nicht erreichbar.
+//! Auch die WebSocket-Verbindung des Multiplayers läuft hierüber (HTTP/1.1-Upgrade oder
+//! HTTP/2 mit erweitertem CONNECT). Für die lokale Entwicklung gibt es dieselbe
+//! Auslieferung ohne TLS ([`run_plain_server`]).
 
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Duration};
 
 use axum::{
-    Router,
+    Extension, Router,
     http::{HeaderMap, Request, StatusCode, header},
 };
 use bytes::Bytes;
@@ -42,10 +45,10 @@ pub async fn run_server(
     tokio::pin!(shutdown);
 
     loop {
-        let stream = tokio::select! {
+        let (stream, peer) = tokio::select! {
             () = &mut shutdown => break,
             accepted = listener.accept() => match accepted {
-                Ok((stream, _)) => stream,
+                Ok(accepted) => accepted,
                 Err(error) => {
                     // z. B. EMFILE: kurz warten, statt in einer Fehlerschleife zu kreisen
                     eprintln!("TCP-Verbindung konnte nicht angenommen werden: {error}");
@@ -55,7 +58,10 @@ pub async fn run_server(
             },
         };
         let acceptor = acceptor.clone();
-        let service = TowerToHyperService::new(app.clone());
+        let service = TowerToHyperService::new(
+            app.clone()
+                .layer(Extension(totenrunde_mp_server::PeerAddr(peer.ip()))),
+        );
         let watcher = graceful.watcher();
         tokio::spawn(async move {
             // Abgebrochene Handshakes (Scanner, Port-Checks) sind normal und werden nicht protokolliert.
@@ -69,14 +75,59 @@ pub async fn run_server(
                 .http1()
                 .timer(TokioTimer::new())
                 .header_read_timeout(HEADER_READ_TIMEOUT);
-            builder.http2().timer(TokioTimer::new());
-            let connection = builder.serve_connection(TokioIo::new(stream), service);
-            if let Err(error) = watcher.watch(connection).await {
+            builder
+                .http2()
+                .timer(TokioTimer::new())
+                .enable_connect_protocol();
+            let connection = builder.serve_connection_with_upgrades(TokioIo::new(stream), service);
+            if let Err(error) = watcher.watch(connection.into_owned()).await {
                 eprintln!("HTTPS-Verbindung fehlgeschlagen: {error}");
             }
         });
     }
 
+    drop(listener);
+    let _ = tokio::time::timeout(SHUTDOWN_TIMEOUT, graceful.shutdown()).await;
+    Ok(())
+}
+
+/// HTTP/1.1 ohne TLS, nur für die lokale Entwicklung (`HTTP_PORT`).
+pub async fn run_plain_server(
+    listener: TcpListener,
+    app: Router,
+    shutdown: impl Future<Output = ()> + Send,
+) -> Result<(), DynError> {
+    let graceful = GracefulShutdown::new();
+    tokio::pin!(shutdown);
+    loop {
+        let (stream, peer) = tokio::select! {
+            () = &mut shutdown => break,
+            accepted = listener.accept() => match accepted {
+                Ok(accepted) => accepted,
+                Err(error) => {
+                    eprintln!("TCP-Verbindung konnte nicht angenommen werden: {error}");
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    continue;
+                }
+            },
+        };
+        let service = TowerToHyperService::new(
+            app.clone()
+                .layer(Extension(totenrunde_mp_server::PeerAddr(peer.ip()))),
+        );
+        let watcher = graceful.watcher();
+        tokio::spawn(async move {
+            let mut builder = Builder::new(TokioExecutor::new()).http1_only();
+            builder
+                .http1()
+                .timer(TokioTimer::new())
+                .header_read_timeout(HEADER_READ_TIMEOUT);
+            let connection = builder.serve_connection_with_upgrades(TokioIo::new(stream), service);
+            if let Err(error) = watcher.watch(connection.into_owned()).await {
+                eprintln!("HTTP-Verbindung fehlgeschlagen: {error}");
+            }
+        });
+    }
     drop(listener);
     let _ = tokio::time::timeout(SHUTDOWN_TIMEOUT, graceful.shutdown()).await;
     Ok(())
@@ -125,7 +176,7 @@ mod tests {
     use tower_http::set_header::SetResponseHeaderLayer;
 
     use super::{request_once, run_server};
-    use crate::{router, tls};
+    use crate::{tests::router, tls};
 
     #[tokio::test]
     async fn serves_https_over_tcp_and_advertises_http3() {
@@ -187,5 +238,63 @@ mod tests {
             .unwrap()
             .unwrap();
         fs::remove_dir_all(web).unwrap();
+    }
+
+    /// Die WebSocket-Verbindung des Multiplayers braucht das HTTP/1.1-Upgrade dieses Servers.
+    #[tokio::test]
+    async fn plain_server_upgrades_multiplayer_websocket() {
+        use futures_util::{SinkExt, StreamExt};
+        use tokio_tungstenite::tungstenite::Message;
+        use totenrunde_mp_server::protocol::{
+            ClientMsg, ServerMsg, VERSION, WS_PATH, decode, encode,
+        };
+        use totenrunde_mp_server::{Db, Multiplayer};
+
+        let db = Db::in_memory();
+        let anna = db.register("Anna", "geheim123").unwrap();
+        let token = db
+            .create_session(anna.id, totenrunde_mp_server::db::Device::Game)
+            .unwrap();
+        let app = crate::router(PathBuf::new(), PathBuf::new(), Some(Multiplayer::new(db)));
+        let listener = TcpListener::bind(SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 0)))
+            .await
+            .unwrap();
+        let address = listener.local_addr().unwrap();
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+        let server = tokio::spawn(super::run_plain_server(listener, app, async {
+            let _ = shutdown_rx.await;
+        }));
+
+        let (mut socket, _) = tokio_tungstenite::connect_async(format!("ws://{address}{WS_PATH}"))
+            .await
+            .unwrap();
+        let hello = ClientMsg::Hello {
+            version: VERSION,
+            token: Some(token),
+        };
+        socket
+            .send(Message::Binary(encode(&hello).into()))
+            .await
+            .unwrap();
+        let reply = tokio::time::timeout(Duration::from_secs(5), socket.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        let Message::Binary(bytes) = reply else {
+            panic!("binäre Antwort erwartet");
+        };
+        assert!(matches!(
+            decode::<ServerMsg>(&bytes),
+            Some(ServerMsg::Welcome { account: Some(a) }) if a.name == "Anna"
+        ));
+
+        drop(socket);
+        shutdown_tx.send(()).unwrap();
+        tokio::time::timeout(Duration::from_secs(5), server)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
     }
 }

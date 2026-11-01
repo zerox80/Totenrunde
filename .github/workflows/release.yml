@@ -50,6 +50,9 @@ jobs:
 
       - name: Bauen
         shell: bash
+        env:
+          # Standard-Server für den Multiplayer (Repository-Variable, z. B. https://spiel.example.de)
+          TR_SERVER: ${{ vars.TR_SERVER }}
         run: |
           # Linux: kein PIE, damit Dateimanager das Programm per Doppelklick starten
           # (PIE-Programme gelten bei manchen als „Bibliothek“)
