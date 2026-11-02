@@ -240,10 +240,12 @@ def build_galil():
         b.box((0.007, 0.4, 0.0), (0.002, 0.012, 0.012), m),
         b.box((-0.007, 0.4, 0.0), (0.002, 0.012, 0.012), m),
     ), "black"))
+    # Tragegriff: die beiden Holme sitzen seitlich am Gehäuse, damit die Visierlinie
+    # (x = 0, z = 0) zwischen ihnen frei bleibt. Vorher standen sie genau im Loch der
+    # Lochkimme und verdeckten beim Zielen fast das ganze Bild.
     body.append(solid("Carry", lambda b, m: (
-        b.box((0, 0.075, 0.012), (0.012, 0.11, 0.008), m),
-        b.box((0, 0.025, -0.002), (0.01, 0.01, 0.022), m),
-        b.box((0, 0.125, -0.002), (0.01, 0.01, 0.022), m),
+        b.box((0, 0.075, 0.012), (0.036, 0.11, 0.008), m),
+        *[b.box((sx * 0.0135, y, -0.006), (0.006, 0.01, 0.03), m) for sx in (-1, 1) for y in (0.025, 0.125)],
     ), "black"))
     body.append(ext("Grip", [(-0.06, -0.058), (-0.032, -0.058), (-0.04, -0.09), (-0.052, -0.148), (-0.09, -0.144), (-0.08, -0.09), (-0.074, -0.058)], 0.031, "polymer_checker"))
     body.append(solid("TrigGuard", lambda b, m: b.extrude([(-0.034, -0.06), (0.03, -0.06), (0.028, -0.088), (-0.036, -0.09)], 0.009, m), "parkerized",
@@ -255,7 +257,8 @@ def build_galil():
         b.box((0, -0.405, -0.072), (0.034, 0.016, 0.1), m),
     ), "parkerized"))
     body.append(ext("ButtPad", [(-0.424, -0.022), (-0.412, -0.022), (-0.412, -0.122), (-0.424, -0.122)], 0.038, "rubber"))
-    slide.append(box("Charging", (0.0, 0.06, -0.006), (0.012, 0.012, 0.016), "black", rot=(0, 0, 0)))
+    # Spannhebel rechts am Gehäuse (nicht auf der Visierlinie)
+    slide.append(box("Charging", (0.02, 0.06, -0.026), (0.012, 0.012, 0.016), "black", rot=(0, 0, 0)))
     mag.append(curved_mag("Mag", (0.06, -0.062), 0.21, 0.07, 0.032, 0.025, "parkerized", ribs=3))
 
     def pose(arms, b, m, s):
