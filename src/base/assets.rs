@@ -52,6 +52,10 @@ pub struct GameAssets {
     /// Alle Waffen der Mysteriösen Kiste. Schon beim Laden geholt und dauerhaft gehalten:
     /// sonst lädt die Kiste beim Rollen jedes Modell samt Texturen neu (Ruckeln).
     pub weapons: Vec<Handle<Gltf>>,
+    /// Modelle, die sonst erst mitten im Spiel geladen würden (Perks, Power-ups, Verstärker,
+    /// Wandwaffen). Im Browser würde das Dekodieren und Mipmaps-Bauen den Hauptthread
+    /// blockieren – genau die kurzen Ruckler beim ersten Auftauchen.
+    pub preload: Vec<Handle<Gltf>>,
     pub planks: Handle<Image>,
     pub font_bold: Handle<Font>,
     pub font_regular: Handle<Font>,
@@ -93,9 +97,33 @@ fn load_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
         .filter(|p| crate::world::mapdata::asset_exists(p))
         .map(|p| asset_server.load(p))
         .collect();
+    let mut preload = Vec::new();
+    for w in crate::weapons::WEAPONS {
+        preload.push(asset_server.load(w.model()));
+    }
+    for perk in crate::game::perks::Perk::ALL {
+        preload.push(asset_server.load(perk.model()));
+    }
+    for kind in crate::game::powerups::PowerupKind::ALL {
+        preload.push(asset_server.load(kind.model()));
+    }
+    for path in [
+        "models/weapons/knife.gltf",
+        "models/weapons/perk_bottle.gltf",
+        "models/pap.gltf",
+        "models/power_switch.gltf",
+        "models/mystery_box.gltf",
+        "models/mystery_box_lid.gltf",
+        "models/teddy.gltf",
+    ] {
+        if crate::world::mapdata::asset_exists(path) {
+            preload.push(asset_server.load(path));
+        }
+    }
     commands.insert_resource(GameAssets {
         zombies,
         weapons,
+        preload,
         planks: asset_server.load("textures/planks.png"),
         font_bold: asset_server.load("fonts/Montserrat-ExtraBold.otf"),
         font_regular: asset_server.load("fonts/Montserrat-SemiBold.otf"),
@@ -115,6 +143,7 @@ fn check_loaded(
         .zombies
         .iter()
         .chain(&assets.weapons)
+        .chain(&assets.preload)
         .any(|z| !asset_server.is_loaded_with_dependencies(z))
     {
         return;
@@ -225,5 +254,47 @@ fn track_textures(
         progress.fraction = 1.0;
         info!("Alle {} Texturen geladen", images.len());
         commands.insert_resource(TexturesReady);
+    }
+}
+
+/// Pfad einer vorab verkleinerten Texturvariante (`textures/<größe>/…`), die
+/// `backend/optimize-textures.py` erzeugt. Nur im Browser relevant: Dort lädt der
+/// AssetReader sonst die Originaldatei, obwohl die Laufzeit sie gleich wieder
+/// herunterrechnet. Lightmaps bleiben unangetastet, ab 2048 wird das Original geladen.
+#[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+pub fn texture_variant(path: &str, texture_max: u32) -> Option<String> {
+    let size = match texture_max {
+        0..=512 => "512",
+        513..=1024 => "1024",
+        _ => return None,
+    };
+    let (prefix, rest) = path.split_once("textures/")?;
+    let name = rest.rsplit('/').next()?;
+    if !name.ends_with(".png") || name.starts_with("lm_") {
+        return None;
+    }
+    Some(format!("{prefix}textures/{size}/{rest}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::texture_variant;
+
+    #[test]
+    fn texture_variants_only_for_known_textures() {
+        assert_eq!(
+            texture_variant("assets/textures/concrete.png", 1024).as_deref(),
+            Some("assets/textures/1024/concrete.png")
+        );
+        assert_eq!(
+            texture_variant("textures/concrete_n.png", 512).as_deref(),
+            Some("textures/512/concrete_n.png")
+        );
+        assert_eq!(
+            texture_variant("textures/lm_endstation_main.png", 1024),
+            None
+        );
+        assert_eq!(texture_variant("textures/concrete.png", 2048), None);
+        assert_eq!(texture_variant("ui/concrete.png", 1024), None);
     }
 }
