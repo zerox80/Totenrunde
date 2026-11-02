@@ -4,7 +4,7 @@ pub mod assets;
 pub mod debug;
 pub mod i18n;
 pub mod platform;
-mod render_scale;
+pub mod render_scale;
 pub mod settings;
 pub mod state;
 pub mod textures;

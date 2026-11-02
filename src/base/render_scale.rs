@@ -27,7 +27,34 @@ pub struct RenderScalePlugin;
 
 impl Plugin for RenderScalePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PostUpdate, sync_render_scale);
+        app.init_resource::<RenderInfo>()
+            .add_systems(PostUpdate, sync_render_scale);
+    }
+}
+
+/// Tatsächliche Auflösung der 3D-Szene (für die F3-Anzeige).
+#[derive(Resource, Default)]
+pub struct RenderInfo {
+    pub size: UVec2,
+    pub scale: f32,
+}
+
+impl RenderInfo {
+    /// z. B. "1527x954 (53 %) | WebGL2" – nur ASCII, die HUD-Schrift kennt kein "×"/"·".
+    pub fn label(&self) -> String {
+        let api = if cfg!(not(target_arch = "wasm32")) {
+            ""
+        } else if cfg!(feature = "webgpu") {
+            " | WebGPU"
+        } else {
+            " | WebGL2"
+        };
+        format!(
+            "{}x{} ({:.0} %){api}",
+            self.size.x,
+            self.size.y,
+            self.scale * 100.0
+        )
     }
 }
 
@@ -84,12 +111,25 @@ fn sync_render_scale(
     cameras: Query<(Entity, &RenderTarget), With<PlayerCamera>>,
     mut views: Query<(Entity, Option<&mut ImageNode>), With<ScaledView>>,
     mut images: ResMut<Assets<Image>>,
+    mut info: ResMut<RenderInfo>,
 ) {
     let full = window.physical_size();
     let scale = render_scale(&settings, &window);
     let Ok((camera, target)) = cameras.single() else {
         return;
     };
+    let shown = if scale >= 0.999 { 1.0 } else { scale };
+    let size = (full.as_vec2() * shown).round().as_uvec2();
+    if info.size != size || info.scale != shown {
+        info!(
+            "Renderauflösung {}×{} ({:.0} %)",
+            size.x,
+            size.y,
+            shown * 100.0
+        );
+        info.size = size;
+        info.scale = shown;
+    }
     if scale >= 0.999 || full.x == 0 || full.y == 0 {
         if target.as_image().is_some() {
             commands.entity(camera).insert(RenderTarget::default());

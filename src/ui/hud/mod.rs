@@ -182,12 +182,14 @@ fn crosshair_visibility(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn debug_text(
     keys: Res<ButtonInput<KeyCode>>,
     mut show: ResMut<ShowFps>,
     mut settings: ResMut<crate::base::settings::Settings>,
     cfg: Res<crate::base::debug::DebugConfig>,
     diag: Res<DiagnosticsStore>,
+    render: Res<crate::base::render_scale::RenderInfo>,
     player: Query<(&Transform, &Player)>,
     mut text: Query<&mut Text, With<DebugText>>,
 ) {
@@ -203,7 +205,8 @@ fn debug_text(
     for mut t in text.iter_mut() {
         t.0 = if show.0 || cfg.active {
             format!(
-                "{fps:.0} FPS  pos {:.1} {:.1} {:.1}  yaw {:.0}",
+                "{fps:.0} FPS | {}  pos {:.1} {:.1} {:.1}  yaw {:.0}",
+                render.label(),
                 tf.translation.x,
                 tf.translation.y,
                 tf.translation.z,
