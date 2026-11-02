@@ -73,16 +73,27 @@ async fn main() -> Result<(), DynError> {
             let asset_root = configured_root("ASSET_ROOT", "/app/assets", local_asset_root());
             let data_dir = configured_root("DATA_DIR", "/data", local_data_dir());
             let database = data_dir.join("totenrunde.sqlite3");
-            // Multiplayer (Konten, Lobbys, Relay) aus dem SDK; mit MULTIPLAYER=0 abschaltbar
+            // Multiplayer (Konten, Lobbys, Relay) aus dem SDK; mit MULTIPLAYER=0 abschaltbar.
+            // Ist die Datenbank nicht nutzbar, läuft das Spiel solo weiter, statt den
+            // gesamten Webserver zu beenden.
             let multiplayer = if multiplayer_enabled() {
-                let db = Db::open(&database).map_err(|error| {
-                    format!("Datenbank {} nicht nutzbar: {error}", database.display())
-                })?;
-                println!(
-                    "Multiplayer an, Konten und Statistik: {}",
-                    database.display()
-                );
-                Some(Multiplayer::new(db))
+                match Db::open(&database) {
+                    Ok(db) => {
+                        println!(
+                            "Multiplayer an, Konten und Statistik: {}",
+                            database.display()
+                        );
+                        Some(Multiplayer::new(db))
+                    }
+                    Err(error) => {
+                        eprintln!(
+                            "Warnung: Multiplayer abgeschaltet, Datenbank {} nicht nutzbar: {error}. \
+                             /data muss ein beschreibbares Volume sein (siehe backend/compose.yaml).",
+                            database.display()
+                        );
+                        None
+                    }
+                }
             } else {
                 println!("Multiplayer abgeschaltet (MULTIPLAYER=0)");
                 None
