@@ -95,6 +95,9 @@ weapon.dsr50.pap = Totenstille
 weapon.python.pap = Natternbiss
 weapon.mgl.pap = Weltuntergang
 weapon.raygun.pap = Strahlenkanone X2
+weapon.skorpion.pap = Giftstachel
+weapon.ksg.pap = Doppelter Abschied
+weapon.an94.pap = Totenglocke
 
 error.assets_missing = Der Ordner „assets“ wurde nicht gefunden:\n{path}\n\nBitte das heruntergeladene Archiv vollständig entpacken und Totenrunde aus dem entpackten Ordner starten.
 error.crashed = Totenrunde ist abgestürzt:\n\n{message}\n\nDetails stehen in:\n{path}

@@ -95,6 +95,9 @@ weapon.dsr50.pap = Silenzio di Morte
 weapon.python.pap = Morso di Vipera
 weapon.mgl.pap = Apocalisse
 weapon.raygun.pap = Cannone a raggi X2
+weapon.skorpion.pap = Pungiglione Velenoso
+weapon.ksg.pap = Doppio Addio
+weapon.an94.pap = Rintocco Funebre
 
 error.assets_missing = Cartella "assets" non trovata:\n{path}\n\nEstrai completamente l'archivio scaricato e avvia Totenrunde dalla cartella estratta.
 error.crashed = Totenrunde si è bloccato:\n\n{message}\n\nDettagli in:\n{path}

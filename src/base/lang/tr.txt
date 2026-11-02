@@ -95,6 +95,9 @@ weapon.dsr50.pap = Ölüm Sessizliği
 weapon.python.pap = Engerek Isırığı
 weapon.mgl.pap = Kıyamet
 weapon.raygun.pap = Işın topu X2
+weapon.skorpion.pap = Zehirli İğne
+weapon.ksg.pap = Çifte Veda
+weapon.an94.pap = Ölüm Çanı
 
 error.assets_missing = "assets" klasörü bulunamadı:\n{path}\n\nİndirilen arşivi tamamen çıkar ve Totenrunde'yi çıkarılan klasörden başlat.
 error.crashed = Totenrunde çöktü:\n\n{message}\n\nAyrıntılar:\n{path}

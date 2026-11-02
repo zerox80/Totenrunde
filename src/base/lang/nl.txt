@@ -95,6 +95,9 @@ weapon.dsr50.pap = Doodse Stilte
 weapon.python.pap = Adderbeet
 weapon.mgl.pap = Wereldeinde
 weapon.raygun.pap = Straalkanon X2
+weapon.skorpion.pap = Gifangel
+weapon.ksg.pap = Dubbel Afscheid
+weapon.an94.pap = Doodsklok
 
 error.assets_missing = De map "assets" is niet gevonden:\n{path}\n\nPak het gedownloade archief volledig uit en start Totenrunde vanuit de uitgepakte map.
 error.crashed = Totenrunde is gecrasht:\n\n{message}\n\nDetails staan in:\n{path}

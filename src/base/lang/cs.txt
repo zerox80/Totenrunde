@@ -95,6 +95,9 @@ weapon.dsr50.pap = Mrtvé ticho
 weapon.python.pap = Hadí kousnutí
 weapon.mgl.pap = Konec světa
 weapon.raygun.pap = Paprskové dělo X2
+weapon.skorpion.pap = Jedovaté žihadlo
+weapon.ksg.pap = Dvojité sbohem
+weapon.an94.pap = Umíráček
 
 error.assets_missing = Složka „assets“ nebyla nalezena:\n{path}\n\nRozbal celý stažený archiv a spusť Totenrunde z rozbalené složky.
 error.crashed = Totenrunde spadlo:\n\n{message}\n\nPodrobnosti v:\n{path}

@@ -95,6 +95,9 @@ weapon.dsr50.pap = Мёртвая тишина
 weapon.python.pap = Укус гадюки
 weapon.mgl.pap = Конец света
 weapon.raygun.pap = Лучевая пушка X2
+weapon.skorpion.pap = Ядовитое жало
+weapon.ksg.pap = Двойное прощание
+weapon.an94.pap = Похоронный звон
 
 error.assets_missing = Папка «assets» не найдена:\n{path}\n\nПолностью распакуй скачанный архив и запусти Totenrunde из распакованной папки.
 error.crashed = Totenrunde аварийно завершилась:\n\n{message}\n\nПодробности в файле:\n{path}

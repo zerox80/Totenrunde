@@ -11,7 +11,7 @@ import math
 from mathutils import Vector
 
 from .kit import F, bake_weapon, finish, join, load_arms, remove_arms, uv_atlas
-from .parts import box, curved_mag, ext, lathe, left_support, rail, right_grip, solid, tube
+from .parts import box, curved_mag, ext, lathe, left_support, left_vgrip, rail, right_grip, solid, tube
 
 
 def assemble(wid, body, mag, slide, shift, pose, muzzle):
@@ -272,48 +272,120 @@ def build_galil():
 
 
 def build_rpd():
+    """RPD: leichtes MG mit Gurttrommel unter dem Gehäuse, Holzschaft und -handschutz,
+    Gasrohr unter dem Lauf, Tangentenvisier vor dem Zuführdeckel und eingeklapptem Zweibein."""
     sh = 0.06
     body, mag, slide = [], [], []
-    ax = -0.038
-    body.append(solid("Receiver", lambda b, m: (
-        b.box((0, 0.02, -0.042), (0.036, 0.29, 0.04), m),
-        b.box((0, 0.02, -0.018), (0.044, 0.22, 0.012), m),
-    ), "blued", cuts=lambda c, m: c.box((0.018, 0.08, -0.04), (0.012, 0.08, 0.014), m)))
+    ax = -0.038  # Laufachse
+    # Gehäuse: Seitenprofil mit Abzugsgehäuse, Auswurf und Sicken rechts
+    body.append(ext("Receiver", [(-0.128, -0.021), (0.172, -0.021), (0.178, -0.027), (0.178, -0.056), (0.15, -0.062),
+                                 (0.03, -0.062), (0.0, -0.058), (-0.06, -0.058), (-0.128, -0.052)], 0.034, "blued",
+                    cuts=[lambda c, m: c.box((0.017, 0.045, -0.036), (0.008, 0.07, 0.014), m),
+                          lambda c, m: [c.box((sx * 0.0172, -0.07, -0.04), (0.002, 0.07, 0.003), m) for sx in (-1, 1)]]))
+    # Zuführdeckel (oben gewölbt) mit Verschluss hinten und Nieten
+    body.append(solid("FeedCover", lambda b, m: (
+        b.box((0, 0.045, -0.019), (0.036, 0.15, 0.008), m),
+        b.cyl((0, 0.045, -0.024), 0.0175, 0.15, m, axis="Y", seg=28),
+        b.box((0, -0.035, -0.014), (0.02, 0.012, 0.01), m),
+        *[b.cyl((sx * 0.0178, y, -0.02), 0.0022, 0.003, m, axis="X", seg=10) for sx in (-1, 1) for y in (-0.01, 0.05, 0.1)],
+    ), "blued", cuts=lambda c, m: c.box((0, 0.045, -0.038), (0.03, 0.16, 0.02), m)))
+    # Gurteinführung links und Hülsenauswurf-Rampe rechts
+    body.append(box("FeedTray", (-0.024, 0.05, -0.034), (0.016, 0.07, 0.022), "parkerized"))
+    body.append(box("Deflector", (0.021, 0.045, -0.05), (0.008, 0.05, 0.006), "blued"))
+    # Tangentenvisier vorn auf dem Gehäuse (Kimme bei z = 0) mit Schieber
     body.append(solid("RearSight", lambda b, m: (
-        b.box((0, -0.03, -0.007), (0.026, 0.03, 0.012), m),
-        b.box((0, -0.03, 0.0), (0.018, 0.006, 0.006), m),
-    ), "black", cuts=lambda c, m: c.box((0, -0.03, 0.002), (0.003, 0.03, 0.004), m)))
-    body.append(ext("Guard", [(0.165, -0.032), (0.4, -0.036), (0.405, -0.05), (0.4, -0.068), (0.175, -0.08), (0.165, -0.07)], 0.05, "wood"))
-    body.append(tube("Barrel", 0.16, 0.85, 0.012, "blued", z=ax))
-    body.append(tube("GasTube", 0.4, 0.6, 0.007, "blued", z=ax - 0.02))
-    body.append(lathe("Flash", [(0.0, 0.84), (0.015, 0.84), (0.016, 0.89), (0.0, 0.89)], "black", center=(0, 0, ax)))
+        b.box((0, 0.15, -0.014), (0.03, 0.045, 0.012), m),
+        b.box((0, 0.152, -0.006), (0.022, 0.05, 0.004), m, rot=(3, 0, 0)),
+        b.box((0, 0.14, -0.001), (0.026, 0.008, 0.007), m),
+        b.box((0, 0.128, 0.0), (0.018, 0.004, 0.006), m),
+    ), "black", cuts=lambda c, m: c.box((0, 0.128, 0.0025), (0.003, 0.02, 0.004), m)))
+    # Lauf mit Mutter am Gehäuse, Verjüngung, Gewinde und Mündungsmutter
+    body.append(lathe("Barrel", [(0.0, 0.17), (0.0165, 0.17), (0.0165, 0.2), (0.0128, 0.205), (0.0122, 0.5), (0.0108, 0.52),
+                                 (0.0104, 0.84), (0.0092, 0.842), (0.0092, 0.868), (0.0118, 0.87), (0.0118, 0.9), (0.0, 0.9)],
+                      "blued", center=(0, 0, ax), seg=32))
+    body.append(lathe("Crown", [(0.0, 0.899), (0.0062, 0.899), (0.0062, 0.903), (0.0, 0.903)], "black", center=(0, 0, ax)))
+    # Gasrohr unter dem Lauf, Gasblock mit Regler und vorderem Riemenbügel
+    gz = ax - 0.023
+    body.append(tube("GasTube", 0.2, 0.63, 0.0088, "blued", z=gz))
+    body.append(solid("GasBlock", lambda b, m: (
+        b.box((0, 0.645, ax - 0.012), (0.024, 0.04, 0.034), m),
+        b.cyl((0, 0.645, gz), 0.0105, 0.04, m, axis="Y", seg=20),
+        b.cyl((0.014, 0.65, gz), 0.007, 0.012, m, axis="X", seg=16),
+    ), "parkerized"))
+    body.append(solid("SwivelFront", lambda b, m: (
+        b.box((0, 0.66, gz - 0.016), (0.004, 0.012, 0.012), m),
+        b.cyl((0, 0.66, gz - 0.024), 0.006, 0.004, m, axis="X", seg=14),
+    ), "steel", cuts=lambda c, m: c.cyl((0, 0.66, gz - 0.024), 0.0035, 0.02, m, axis="X", seg=12)))
+    # Handschutz aus Holz mit Griffrillen und Blechkappe
+    body.append(ext("Handguard", [(0.185, -0.032), (0.4, -0.034), (0.408, -0.045), (0.405, -0.068), (0.395, -0.079),
+                                  (0.2, -0.081), (0.188, -0.07)], 0.052, "wood", bevel=0.0035,
+                    cuts=lambda c, m: [c.box((sx * 0.026, 0.295, z), (0.004, 0.17, 0.0035), m)
+                                       for sx in (-1, 1) for z in (-0.05, -0.058, -0.066)]))
+    body.append(lathe("GuardCap", [(0.0, 0.405), (0.024, 0.405), (0.024, 0.418), (0.0, 0.418)], "blued", center=(0, 0, ax - 0.018)))
+    # Korn mit Schutzohren auf einer Laufschelle
     body.append(solid("FrontSight", lambda b, m: (
-        b.box((0, 0.82, ax + 0.02), (0.016, 0.02, 0.03), m),
-        b.box((0, 0.82, -0.003), (0.0026, 0.004, 0.008), m),
+        b.cyl((0, 0.81, ax), 0.0145, 0.03, m, axis="Y", seg=24),
+        b.box((0, 0.81, ax + 0.02), (0.014, 0.022, 0.024), m),
+        b.box((0, 0.812, -0.004), (0.0026, 0.004, 0.009), m),
+        *[b.box((sx * 0.009, 0.81, -0.006), (0.003, 0.018, 0.014), m) for sx in (-1, 1)],
     ), "black"))
+    # Zweibein eingeklappt: Schelle, zwei Beine mit Füßen und Verriegelung
     body.append(solid("Bipod", lambda b, m: (
-        b.box((0.012, 0.62, ax - 0.025), (0.006, 0.28, 0.006), m),
-        b.box((-0.012, 0.62, ax - 0.025), (0.006, 0.28, 0.006), m),
-        b.box((0, 0.48, ax - 0.022), (0.03, 0.02, 0.012), m),
-    ), "blued"))
-    stock = [(-0.46, -0.03), (-0.13, -0.036), (-0.105, -0.062), (-0.135, -0.09), (-0.2, -0.12), (-0.46, -0.16)]
-    body.append(ext("Stock", stock, 0.044, "wood", bevel=0.0012))
-    body.append(ext("Grip", [(-0.075, -0.06), (-0.045, -0.06), (-0.05, -0.1), (-0.062, -0.15), (-0.1, -0.146), (-0.09, -0.06)], 0.03, "wood"))
-    body.append(solid("TrigGuard", lambda b, m: b.extrude([(-0.045, -0.06), (0.025, -0.06), (0.022, -0.088), (-0.046, -0.09)], 0.009, m), "blued",
-                      cuts=lambda c, m: c.extrude([(-0.041, -0.064), (0.019, -0.064), (0.017, -0.083), (-0.042, -0.085)], 0.02, m)))
-    slide.append(box("Charging", (0.024, 0.12, -0.04), (0.016, 0.012, 0.01), "steel"))
+        b.cyl((0, 0.715, ax), 0.0138, 0.024, m, axis="Y", seg=24),
+        b.box((0, 0.715, ax - 0.016), (0.03, 0.02, 0.012), m),
+        *[b.cyl_between((sx * 0.012, 0.712, ax - 0.02), (sx * 0.014, 0.44, ax - 0.026), 0.0042, m, seg=12) for sx in (-1, 1)],
+        *[b.box((sx * 0.014, 0.432, ax - 0.03), (0.012, 0.022, 0.006), m) for sx in (-1, 1)],
+        b.box((0, 0.47, ax - 0.022), (0.034, 0.008, 0.006), m),
+    ), "parkerized"))
+    # Holzschaft mit Kamm, Daumenmulde und Stahlkappe; hinterer Riemenbügel
+    # Hals reicht ins Gehäuse; Unterkante fällt zur Kolbenkappe hin ab (Seitenprofil des RPD)
+    stock = [(-0.465, -0.026), (-0.3, -0.03), (-0.118, -0.023), (-0.118, -0.054), (-0.15, -0.066), (-0.2, -0.082),
+             (-0.3, -0.108), (-0.465, -0.148)]
+    body.append(ext("Stock", stock, 0.038, "wood", bevel=0.005))
+    # Wangenauflage und runder Kolbenrücken (breiter als der Hals)
+    body.append(ext("StockCheek", [(-0.455, -0.03), (-0.3, -0.033), (-0.26, -0.04), (-0.27, -0.09), (-0.455, -0.13)],
+                    0.046, "wood", bevel=0.008))
+    body.append(ext("ButtPlate", [(-0.478, -0.026), (-0.465, -0.027), (-0.465, -0.151), (-0.478, -0.148)], 0.046, "steel",
+                    cuts=lambda c, m: c.box((-0.4775, 0.0, -0.1), (0.004, 0.02, 0.05), m)))
+    body.append(solid("SwivelRear", lambda b, m: (
+        b.box((0, -0.36, -0.132), (0.004, 0.014, 0.012), m),
+        b.cyl((0, -0.36, -0.142), 0.0065, 0.004, m, axis="X", seg=14),
+    ), "steel", cuts=lambda c, m: c.cyl((0, -0.36, -0.142), 0.004, 0.02, m, axis="X", seg=12)))
+    # Pistolengriff aus Holz, Abzugsbügel und Abzug
+    # Pistolengriff nach hinten geneigt, vorn mit Fingerauflage, unten leicht ausgestellt
+    body.append(ext("Grip", [(-0.07, -0.056), (-0.046, -0.056), (-0.05, -0.075), (-0.058, -0.082), (-0.066, -0.12),
+                             (-0.076, -0.152), (-0.092, -0.157), (-0.108, -0.148), (-0.096, -0.1), (-0.086, -0.056)],
+                    0.03, "wood", bevel=0.005))
+    body.append(solid("TrigGuard", lambda b, m: b.extrude([(-0.046, -0.058), (0.026, -0.058), (0.024, -0.066), (0.014, -0.088), (-0.046, -0.09)], 0.009, m), "blued",
+                      cuts=lambda c, m: c.extrude([(-0.042, -0.062), (0.02, -0.062), (0.011, -0.083), (-0.042, -0.085)], 0.02, m)))
+    body.append(ext("Trigger", [(-0.016, -0.06), (-0.008, -0.06), (-0.012, -0.08), (-0.019, -0.079)], 0.005, "steel"))
+    # Spannhebel rechts mit Griffkugel
+    slide.append(solid("Charging", lambda b, m: (
+        b.box((0.022, 0.125, -0.04), (0.012, 0.016, 0.008), m),
+        b.cyl((0.03, 0.125, -0.04), 0.0065, 0.012, m, axis="X", seg=16),
+    ), "steel"))
+    # Gurttrommel: Gehäuse mit Rändern, Sicken, Nabe, Verschluss und Hals zum Gehäuse
+    dy, dz, dr = 0.072, -0.122, 0.058
     mag.append(solid("Drum", lambda b, m: (
-        b.cyl((0, 0.07, -0.13), 0.075, 0.068, m, axis="X", seg=40),
-        b.cyl((0, 0.07, -0.13), 0.03, 0.074, m, axis="X", seg=24),
-        b.box((0, 0.07, -0.06), (0.03, 0.035, 0.04), m),
-    ), "blued"))
+        b.cyl((0, dy, dz), dr, 0.06, m, axis="X", seg=48),
+        *[b.cyl((sx * 0.03, dy, dz), dr + 0.0025, 0.006, m, axis="X", seg=48) for sx in (-1, 1)],
+        *[b.cyl((sx * 0.031, dy, dz), 0.02, 0.006, m, axis="X", seg=32) for sx in (-1, 1)],
+        b.box((0, dy, -0.068), (0.034, 0.04, 0.02), m),
+        b.box((0, dy + 0.022, -0.07), (0.04, 0.008, 0.012), m),
+        b.box((-0.026, dy - 0.028, dz + 0.05), (0.012, 0.018, 0.01), m),
+    ), "parkerized", cuts=lambda c, m: [c.cyl((sx * 0.034, dy, dz), r, 0.004, m, axis="X", seg=48)
+                                       for sx in (-1, 1) for r in (0.045, 0.034)]))
+    mag.append(solid("DrumLatch", lambda b, m: (
+        b.box((0.0, dy - 0.04, dz + 0.03), (0.028, 0.006, 0.018), m, rot=(-35, 0, 0)),
+        b.cyl((0.0, dy - 0.045, dz + 0.036), 0.004, 0.028, m, axis="X", seg=12),
+    ), "steel"))
 
     def pose(arms, b, m, s):
-        r = right_grip(arms, [b, m], S((-0.066, -0.062), sh), S((-0.08, -0.148), sh), depth=0.042, elbow=(0.24, sh - 0.3, -0.38))
-        l = left_support(arms, [b, m, r], 0.27 + sh, -0.056, 0.025, 0.024)
+        r = right_grip(arms, [b, m], S((-0.072, -0.06), sh), S((-0.084, -0.15), sh), depth=0.042, elbow=(0.24, sh - 0.3, -0.38))
+        l = left_support(arms, [b, m, r], 0.29 + sh, -0.057, 0.026, 0.024)
         return r, l
 
-    assemble("rpd", body, mag, slide, sh, pose, (0, 0.89, ax))
+    assemble("rpd", body, mag, slide, sh, pose, (0, 0.903, ax))
 
 
 # --------------------------------------------------------------------------------------
@@ -476,3 +548,177 @@ def build_mgl():
         return r, l
 
     assemble("mgl", body, mag, slide, sh, pose, (0, 0.345, ax))
+
+
+# --------------------------------------------------------------------------------------
+# Skorpion EVO (kompakte MP aus Polymer mit Schiene und Skelettschaft)
+# --------------------------------------------------------------------------------------
+
+
+def build_skorpion():
+    sh = -0.02
+    body, mag, slide = [], [], []
+    ax = -0.03
+    # Oberes Gehäuse (Polymer) mit Auswurf rechts und durchgehender Schiene
+    body.append(ext("Upper", [(-0.115, -0.016), (0.13, -0.016), (0.134, -0.022), (0.134, -0.046), (-0.115, -0.048)], 0.032, "polymer",
+                    cuts=lambda c, m: c.box((0.016, 0.03, -0.03), (0.008, 0.05, 0.012), m)))
+    body.append(rail("Rail", -0.11, 0.125, -0.016, fin="black", w=0.02))
+    # Diopter hinten, Korn mit Schutzohren vorn (beide auf der Schiene, Visierlinie z = 0)
+    body.append(solid("RearSight", lambda b, m: (
+        b.box((0, -0.035, -0.006), (0.02, 0.014, 0.012), m),
+        *[b.box((sx * 0.0075, -0.035, 0.0015), (0.0035, 0.01, 0.009), m) for sx in (-1, 1)],
+    ), "black", cuts=lambda c, m: c.cyl((0, -0.035, 0.0), 0.0018, 0.04, m, axis="Y", seg=12)))
+    body.append(solid("FrontSight", lambda b, m: (
+        b.box((0, 0.115, -0.007), (0.018, 0.014, 0.012), m),
+        b.box((0, 0.115, -0.002), (0.0024, 0.004, 0.006), m),
+        *[b.box((sx * 0.007, 0.115, 0.0), (0.002, 0.012, 0.012), m) for sx in (-1, 1)],
+    ), "black"))
+    # Unteres Gehäuse mit Magazinschacht, großem Abzugsbügel und Griff
+    body.append(ext("Lower", [(-0.1, -0.046), (0.07, -0.046), (0.07, -0.062), (0.02, -0.066), (-0.04, -0.06), (-0.1, -0.058)], 0.03, "polymer"))
+    body.append(box("MagWell", (0, 0.045, -0.066), (0.03, 0.04, 0.02), "polymer"))
+    body.append(ext("Grip", [(-0.066, -0.058), (-0.04, -0.058), (-0.046, -0.09), (-0.054, -0.148), (-0.092, -0.144), (-0.084, -0.09), (-0.078, -0.058)],
+                    0.031, "polymer_checker", bevel=0.003))
+    body.append(solid("TrigGuard", lambda b, m: b.extrude([(-0.04, -0.06), (0.02, -0.062), (0.022, -0.09), (-0.042, -0.094)], 0.01, m), "polymer",
+                      cuts=lambda c, m: c.extrude([(-0.035, -0.064), (0.015, -0.066), (0.016, -0.085), (-0.036, -0.089)], 0.02, m)))
+    body.append(ext("Trigger", [(-0.012, -0.062), (-0.004, -0.062), (-0.008, -0.082), (-0.015, -0.081)], 0.005, "black"))
+    # Handschutz mit Lüftungsschlitzen, Lauf mit Gewindeschutz
+    body.append(ext("Handguard", [(0.07, -0.046), (0.134, -0.046), (0.134, -0.066), (0.12, -0.072), (0.07, -0.07)], 0.036, "polymer",
+                    cuts=lambda c, m: [c.box((sx * 0.018, 0.09 + i * 0.014, -0.058), (0.004, 0.007, 0.01), m) for sx in (-1, 1) for i in range(3)]))
+    body.append(lathe("Barrel", [(0.0, 0.13), (0.0082, 0.13), (0.0082, 0.19), (0.0105, 0.19), (0.0105, 0.207), (0.0, 0.207)], "blued", center=(0, 0, ax)))
+    # Skelettschaft (ausgeklappt) mit Gummikappe
+    body.append(solid("Stock", lambda b, m: (
+        b.box((0, -0.21, -0.028), (0.012, 0.2, 0.012), m),
+        b.box((0, -0.2, -0.082), (0.012, 0.21, 0.01), m, rot=(-9, 0, 0)),
+        b.box((0, -0.12, -0.05), (0.03, 0.014, 0.04), m),
+        b.box((0, -0.31, -0.06), (0.03, 0.014, 0.09), m),
+    ), "polymer"))
+    body.append(ext("ButtPad", [(-0.33, -0.014), (-0.317, -0.014), (-0.317, -0.108), (-0.33, -0.108)], 0.034, "rubber"))
+    slide.append(solid("Charging", lambda b, m: (
+        b.box((-0.02, 0.07, -0.026), (0.012, 0.012, 0.008), m),
+        b.cyl((-0.027, 0.07, -0.026), 0.0045, 0.008, m, axis="X", seg=12),
+    ), "black"))
+    mag.append(curved_mag("Mag", (0.064, -0.074), 0.15, 0.03, 0.028, 0.021, "polymer", ribs=2))
+
+    def pose(arms, b, m, s):
+        r = right_grip(arms, [b, m], S((-0.06, -0.064), sh), S((-0.076, -0.148), sh), depth=0.04, elbow=(0.24, sh - 0.3, -0.38))
+        l = left_support(arms, [b, m, r], 0.105 + sh, -0.058, 0.019, 0.013)
+        return r, l
+
+    assemble("skorpion", body, mag, slide, sh, pose, (0, 0.207, ax))
+
+
+# --------------------------------------------------------------------------------------
+# KSG (Bullpup-Vorderschaftrepetierer mit zwei Röhrenmagazinen und Vordergriff)
+# --------------------------------------------------------------------------------------
+
+
+def build_ksg():
+    sh = -0.06
+    body, mag, slide = [], [], []
+    ax = -0.032
+    # Gehäuse: Schaftteil hinter dem Griff (Bullpup), vorne flach über den Röhren
+    body.append(ext("Shell", [(-0.42, -0.016), (0.16, -0.016), (0.168, -0.026), (0.168, -0.046), (-0.03, -0.046), (-0.1, -0.05),
+                              (-0.13, -0.124), (-0.4, -0.132), (-0.42, -0.12)], 0.048, "polymer", bevel=0.003,
+                    cuts=lambda c, m: [c.box((0.024, -0.2, -0.05), (0.006, 0.12, 0.03), m),
+                                       c.box((-0.024, -0.26, -0.09), (0.006, 0.14, 0.02), m)]))
+    body.append(ext("ButtPad", [(-0.435, -0.014), (-0.42, -0.014), (-0.42, -0.134), (-0.435, -0.13)], 0.05, "rubber"))
+    body.append(rail("Rail", -0.36, 0.16, -0.016, fin="black", w=0.021))
+    # Klappvisiere auf der Schiene (Kimme hinten, Korn vorn, Visierlinie z = 0)
+    body.append(solid("RearSight", lambda b, m: (
+        b.box((0, 0.05, -0.007), (0.02, 0.016, 0.012), m),
+        *[b.box((sx * 0.0075, 0.05, 0.0012), (0.0035, 0.01, 0.008), m) for sx in (-1, 1)],
+    ), "black", cuts=lambda c, m: c.cyl((0, 0.05, 0.0), 0.0022, 0.04, m, axis="Y", seg=12)))
+    body.append(solid("FrontSight", lambda b, m: (
+        b.box((0, 0.15, -0.007), (0.02, 0.016, 0.012), m),
+        b.box((0, 0.15, -0.002), (0.0025, 0.004, 0.007), m),
+        *[b.box((sx * 0.0075, 0.15, 0.0), (0.002, 0.012, 0.012), m) for sx in (-1, 1)],
+    ), "black"))
+    # Lauf, zwei Röhrenmagazine mit Kappen
+    body.append(lathe("Barrel", [(0.0, 0.16), (0.0125, 0.16), (0.0125, 0.36), (0.0138, 0.362), (0.0138, 0.38), (0.0, 0.38)], "blued", center=(0, 0, ax)))
+    for sx in (-1, 1):
+        body.append(tube(f"MagTube{sx}", 0.0, 0.33, 0.0105, "blued", z=-0.062, x=sx * 0.0125))
+    body.append(solid("TubeCap", lambda b, m: (
+        b.box((0, 0.338, -0.06), (0.05, 0.016, 0.032), m),
+        b.cyl((0, 0.338, ax), 0.016, 0.016, m, axis="Y", seg=24),
+    ), "black"))
+    # Griff vor dem Patronenlager, großer Abzugsbügel
+    body.append(ext("Grip", [(-0.075, -0.05), (-0.046, -0.05), (-0.05, -0.085), (-0.06, -0.142), (-0.098, -0.14), (-0.09, -0.085), (-0.088, -0.05)],
+                    0.032, "polymer_checker", bevel=0.003))
+    body.append(solid("TrigGuard", lambda b, m: b.extrude([(-0.046, -0.05), (0.02, -0.05), (0.02, -0.088), (-0.046, -0.092)], 0.01, m), "polymer",
+                      cuts=lambda c, m: c.extrude([(-0.042, -0.054), (0.014, -0.054), (0.014, -0.083), (-0.042, -0.087)], 0.02, m)))
+    body.append(ext("Trigger", [(-0.02, -0.052), (-0.012, -0.052), (-0.016, -0.074), (-0.023, -0.073)], 0.005, "black"))
+    body.append(box("Selector", (0.0, 0.02, -0.08), (0.05, 0.01, 0.01), "black"))
+    # Vorderschaft (Pumpe) mit senkrechtem Griff
+    slide.append(solid("Pump", lambda b, m: (
+        b.box((0, 0.24, -0.06), (0.05, 0.15, 0.03), m),
+        b.box((0, 0.24, -0.072), (0.04, 0.15, 0.012), m),
+    ), "polymer", bevel=0.004, cuts=lambda c, m: [c.box((sx * 0.025, 0.2 + i * 0.02, -0.06), (0.004, 0.012, 0.024), m) for sx in (-1, 1) for i in range(5)]))
+    slide.append(solid("VGrip", lambda b, m: (
+        b.cyl((0, 0.27, -0.12), 0.015, 0.09, m, seg=24),
+        b.cyl((0, 0.27, -0.168), 0.017, 0.008, m, seg=24),
+    ), "polymer_checker"))
+
+    def pose(arms, b, m, s):
+        r = right_grip(arms, [b], S((-0.07, -0.054), sh), S((-0.088, -0.14), sh), depth=0.042, elbow=(0.24, sh - 0.3, -0.38))
+        l = left_vgrip(arms, [b, s, r], S((0.27, -0.082), sh), S((0.27, -0.16), sh))
+        return r, l
+
+    assemble("ksg", body, mag, slide, sh, pose, (0, 0.38, ax))
+
+
+# --------------------------------------------------------------------------------------
+# AN-94 (Sturmgewehr mit Mündungsbremse, Polymerhandschutz und Skelettschaft)
+# --------------------------------------------------------------------------------------
+
+
+def build_an94():
+    sh = 0.0
+    body, mag, slide = [], [], []
+    ax = -0.034
+    body.append(solid("Receiver", lambda b, m: (
+        b.box((0, 0.0, -0.042), (0.03, 0.26, 0.034), m),
+        b.cyl((0, -0.005, -0.026), 0.0148, 0.24, m, axis="Y", seg=28),
+    ), "parkerized", cuts=[lambda c, m: c.box((0.015, 0.035, -0.03), (0.01, 0.075, 0.012), m),
+                           lambda c, m: c.box((0, 0.0, -0.06), (0.02, 0.22, 0.012), m)]))
+    body.append(box("RearTrunnion", (0, -0.12, -0.044), (0.03, 0.02, 0.04), "parkerized"))
+    # Trommeldiopter hinten am Gehäuse, Korn vorn auf dem Gasblock
+    body.append(solid("RearSight", lambda b, m: (
+        b.box((0, -0.11, -0.01), (0.024, 0.022, 0.014), m),
+        b.cyl((0, -0.11, 0.0), 0.0095, 0.018, m, axis="X", seg=20),
+    ), "black", cuts=lambda c, m: c.cyl((0, -0.11, 0.0), 0.002, 0.05, m, axis="Y", seg=12)))
+    body.append(solid("GasBlock", lambda b, m: (
+        b.box((0, 0.42, ax + 0.004), (0.022, 0.04, 0.03), m),
+        b.box((0, 0.425, -0.012), (0.016, 0.02, 0.02), m),
+        b.box((0, 0.425, -0.002), (0.0024, 0.004, 0.008), m),
+        *[b.box((sx * 0.008, 0.425, 0.0), (0.002, 0.014, 0.014), m) for sx in (-1, 1)],
+    ), "black"))
+    # Polymer-Handschutz oben und unten mit Kühlschlitzen
+    body.append(ext("GuardLow", [(0.13, -0.036), (0.34, -0.038), (0.345, -0.05), (0.34, -0.07), (0.15, -0.074), (0.13, -0.062)], 0.046, "polymer",
+                    bevel=0.003, cuts=lambda c, m: [c.box((sx * 0.023, 0.17 + i * 0.03, -0.056), (0.006, 0.016, 0.01), m) for sx in (-1, 1) for i in range(6)]))
+    body.append(ext("GuardUp", [(0.13, -0.014), (0.34, -0.016), (0.34, -0.03), (0.13, -0.03)], 0.034, "polymer", bevel=0.003,
+                    cuts=lambda c, m: [c.box((sx * 0.017, 0.17 + i * 0.03, -0.022), (0.006, 0.016, 0.006), m) for sx in (-1, 1) for i in range(6)]))
+    # Lauf und markante Mündungsbremse mit Schlitzen
+    body.append(tube("Barrel", 0.13, 0.56, 0.0092, "parkerized", z=ax))
+    body.append(lathe("Brake", [(0.0, 0.555), (0.0145, 0.555), (0.0145, 0.635), (0.012, 0.64), (0.0, 0.64)], "black", center=(0, 0, ax), seg=32))
+    body.append(solid("BrakeSlots", lambda b, m: [b.box((sx * 0.0148, 0.575 + i * 0.016, ax), (0.002, 0.008, 0.012), m) for sx in (-1, 1) for i in range(4)], "black"))
+    # Griff, Abzugsbügel, Sicherungshebel
+    body.append(ext("Grip", [(-0.06, -0.058), (-0.032, -0.058), (-0.042, -0.092), (-0.056, -0.15), (-0.094, -0.146), (-0.082, -0.092), (-0.074, -0.058)],
+                    0.031, "polymer_checker", bevel=0.003))
+    body.append(solid("TrigGuard", lambda b, m: b.extrude([(-0.034, -0.058), (0.04, -0.058), (0.042, -0.066), (0.03, -0.088), (-0.036, -0.09)], 0.008, m), "parkerized",
+                      cuts=lambda c, m: c.extrude([(-0.03, -0.062), (0.032, -0.062), (0.026, -0.083), (-0.031, -0.085)], 0.02, m)))
+    body.append(ext("Trigger", [(-0.006, -0.06), (0.002, -0.06), (-0.002, -0.08), (-0.009, -0.079)], 0.005, "black"))
+    body.append(ext("Safety", [(-0.09, -0.028), (0.04, -0.03), (0.04, -0.036), (-0.09, -0.036)], 0.003, "parkerized", offset=0.0158))
+    # Skelettschaft aus Polymer mit Wangenauflage und Gummikappe
+    body.append(ext("Stock", [(-0.43, -0.022), (-0.13, -0.026), (-0.13, -0.062), (-0.2, -0.082), (-0.43, -0.13)], 0.034, "polymer", bevel=0.003,
+                    cuts=lambda c, m: c.extrude([(-0.38, -0.042), (-0.2, -0.045), (-0.21, -0.07), (-0.38, -0.105)], 0.06, m)))
+    body.append(ext("ButtPad", [(-0.445, -0.02), (-0.43, -0.02), (-0.43, -0.132), (-0.445, -0.128)], 0.038, "rubber"))
+    slide.append(box("Charging", (0.02, 0.075, -0.03), (0.014, 0.012, 0.008), "steel", rot=(0, 0, 10)))
+    mag.append(curved_mag("Mag", (0.062, -0.058), 0.2, 0.085, 0.034, 0.024, "polymer", ribs=4))
+
+    def pose(arms, b, m, s):
+        r = right_grip(arms, [b, m], S((-0.06, -0.06), sh), S((-0.077, -0.148), sh), depth=0.038, elbow=(0.24, sh - 0.3, -0.38))
+        l = left_support(arms, [b, m, r], 0.24 + sh, -0.052, 0.023, 0.022)
+        return r, l
+
+    assemble("an94", body, mag, slide, sh, pose, (0, 0.64, ax))
+

@@ -95,6 +95,9 @@ weapon.dsr50.pap = Silencio Mortal
 weapon.python.pap = Mordisco de Víbora
 weapon.mgl.pap = Fin del Mundo
 weapon.raygun.pap = Cañón de rayos X2
+weapon.skorpion.pap = Aguijón Venenoso
+weapon.ksg.pap = Doble Despedida
+weapon.an94.pap = Toque de Difuntos
 
 error.assets_missing = No se encontró la carpeta «assets»:\n{path}\n\nDescomprime el archivo descargado por completo e inicia Totenrunde desde la carpeta descomprimida.
 error.crashed = Totenrunde se ha cerrado por un error:\n\n{message}\n\nDetalles en:\n{path}

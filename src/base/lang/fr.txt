@@ -95,6 +95,9 @@ weapon.dsr50.pap = Silence de Mort
 weapon.python.pap = Morsure de Vipère
 weapon.mgl.pap = Apocalypse
 weapon.raygun.pap = Canon à rayons X2
+weapon.skorpion.pap = Dard Venimeux
+weapon.ksg.pap = Double Adieu
+weapon.an94.pap = Glas Funèbre
 
 error.assets_missing = Le dossier « assets » est introuvable :\n{path}\n\nDécompresse entièrement l'archive téléchargée et lance Totenrunde depuis le dossier décompressé.
 error.crashed = Totenrunde a planté :\n\n{message}\n\nDétails dans :\n{path}

@@ -21,6 +21,7 @@ use crate::game::powerups::ActivePowerups;
 use crate::game::requests::WorldRequest;
 use crate::net::msg::Req;
 use crate::net::{Session, local_slot};
+use crate::weapons::defs::BoxTier;
 use crate::weapons::{Loadout, WEAPONS, def};
 use crate::world::mapdata::{MapFile, asset_exists};
 
@@ -73,7 +74,11 @@ pub struct MysteryBox {
     pub lid: Entity,
     pub beam: Entity,
     pub interact: Entity,
-    pub display: Option<Entity>,
+    /// Je Kistenwaffe ein fertiges, verstecktes Modell (Waffe, Entity). Beim Rollen werden
+    /// sie nur ein- und ausgeblendet; neu laden würde jedes Mal ruckeln.
+    pub displays: Vec<(usize, Entity)>,
+    /// Gerade angezeigte Waffe
+    pub shown: Option<usize>,
     pub teddy: Entity,
 }
 
@@ -223,6 +228,25 @@ pub fn spawn_box(
             DespawnOnExit(AppState::Playing),
         ))
         .id();
+    let displays = box_weapons()
+        .map(|w| {
+            let e = commands
+                .spawn((
+                    BoxDisplay,
+                    super::WorldWeapon,
+                    WorldAssetRoot(
+                        asset_server.load(GltfAssetLabel::Scene(0).from_asset(def(w).model())),
+                    ),
+                    Transform::from_xyz(0.0, 0.35, 0.0)
+                        .with_rotation(Quat::from_rotation_y(PI / 2.0)),
+                    Visibility::Hidden,
+                    ChildOf(root),
+                ))
+                .observe(super::hide_weapon_hands)
+                .id();
+            (w, e)
+        })
+        .collect();
     commands.insert_resource(MysteryBox {
         spot,
         uses: 0,
@@ -231,40 +255,68 @@ pub fn spawn_box(
         lid,
         beam,
         interact,
-        display: None,
+        displays,
+        shown: None,
         teddy,
     });
 }
 
-/// Zufallswaffe nach Gewichten, ohne Waffen, die der Spieler schon trägt.
-fn roll_weapon(owned: &[usize], rng: &mut impl Rng) -> usize {
-    let cands: Vec<(usize, f32)> = WEAPONS
+/// Alle Waffen, die in der Kiste vorkommen können.
+pub fn box_weapons() -> impl Iterator<Item = usize> {
+    WEAPONS
         .iter()
         .enumerate()
-        .filter(|(i, w)| w.box_weight > 0.0 && !owned.contains(i))
-        .map(|(i, w)| (i, w.box_weight))
+        .filter(|(_, w)| w.box_tier != BoxTier::None && w.box_weight > 0.0)
+        .map(|(i, _)| i)
+}
+
+/// Zufallswaffe: erst die Stufe (40 % schlecht, 40 % mittel, 20 % gut), dann eine Waffe
+/// daraus nach Gewicht – ohne Waffen, die der Spieler schon trägt. Ist eine Stufe dadurch
+/// leer, wird neu gelost (wer alle guten Waffen hat, bekommt eben eine andere).
+fn roll_weapon(owned: &[usize], rng: &mut impl Rng) -> usize {
+    let in_tier = |tier: BoxTier| -> Vec<(usize, f32)> {
+        box_weapons()
+            .filter(|i| WEAPONS[*i].box_tier == tier && !owned.contains(i))
+            .map(|i| (i, WEAPONS[i].box_weight))
+            .collect()
+    };
+    let tiers: Vec<(Vec<(usize, f32)>, f32)> = BoxTier::ODDS
+        .iter()
+        .map(|(tier, odds)| (in_tier(*tier), *odds))
+        .filter(|(cands, _)| !cands.is_empty())
         .collect();
-    let total: f32 = cands.iter().map(|c| c.1).sum();
-    if cands.is_empty() || total <= 0.0 {
-        return 0;
+    let total: f32 = tiers.iter().map(|t| t.1).sum();
+    if tiers.is_empty() || total <= 0.0 {
+        return box_weapons().next().unwrap_or(0);
     }
-    let mut x = rng.random_range(0.0..total);
-    for (i, w) in &cands {
-        if x < *w {
-            return *i;
+    let pick = |items: &[(usize, f32)], x: f32| -> usize {
+        let mut x = x;
+        for (i, w) in items {
+            if x < *w {
+                return *i;
+            }
+            x -= w;
         }
-        x -= w;
-    }
-    cands[cands.len() - 1].0
+        items[items.len() - 1].0
+    };
+    let mut x = rng.random_range(0.0..total);
+    let cands = tiers
+        .iter()
+        .find(|(_, odds)| {
+            let hit = x < *odds;
+            if !hit {
+                x -= odds;
+            }
+            hit
+        })
+        .map(|(c, _)| c)
+        .unwrap_or(&tiers[tiers.len() - 1].0);
+    let weight: f32 = cands.iter().map(|c| c.1).sum();
+    pick(cands, rng.random_range(0.0..weight))
 }
 
 fn any_weapon(rng: &mut impl Rng) -> usize {
-    let c: Vec<usize> = WEAPONS
-        .iter()
-        .enumerate()
-        .filter(|(_, w)| w.box_weight > 0.0)
-        .map(|(i, _)| i)
-        .collect();
+    let c: Vec<usize> = box_weapons().collect();
     c[rng.random_range(0..c.len())]
 }
 
@@ -434,11 +486,9 @@ fn settle(
 /// läuft die Zeit innerhalb der Phase weiter, bis der Schnappschuss die nächste bringt.
 #[allow(clippy::too_many_arguments)]
 pub fn animate_box(
-    mut commands: Commands,
     time: Res<Time>,
     map: Res<MapFile>,
     mbox: Option<ResMut<MysteryBox>>,
-    asset_server: Res<AssetServer>,
     session: Option<Res<Session>>,
     mut tfs: Query<&mut Transform>,
     mut vis: Query<&mut Visibility>,
@@ -474,7 +524,7 @@ pub fn animate_box(
             lid_open = (t / 0.4).min(1.0);
             display_h = Some(0.35 + 0.6 * (t / ROLL_TIME).min(1.0));
             let mut next = next - dt;
-            if next <= 0.0 || mbox.display.is_none_or(|e| tfs.get(e).is_err()) {
+            if next <= 0.0 || mbox.shown.is_none() {
                 // Waffen wechseln immer langsamer
                 next = 0.06 + 0.4 * (t / ROLL_TIME).powi(2);
                 want_weapon = Some(any_weapon(&mut rng));
@@ -482,9 +532,7 @@ pub fn animate_box(
             if t >= ROLL_TIME {
                 if weapon == usize::MAX {
                     mbox.phase = BoxPhase::Teddy { t: 0.0 };
-                    if let Some(d) = mbox.display.take() {
-                        commands.entity(d).despawn();
-                    }
+                    display_h = None;
                 } else {
                     mbox.phase = BoxPhase::Offer {
                         t: 0.0,
@@ -508,7 +556,7 @@ pub fn animate_box(
             // Waffe sinkt in den letzten Sekunden zurück in die Kiste
             let sink = ((t - (OFFER_TIME - 2.0)) / 2.0).clamp(0.0, 1.0);
             display_h = Some(0.95 - 0.6 * sink);
-            if mbox.display.is_none_or(|e| tfs.get(e).is_err()) {
+            if mbox.shown != Some(weapon) {
                 want_weapon = Some(weapon);
             }
             if t >= OFFER_TIME {
@@ -589,37 +637,67 @@ pub fn animate_box(
         let a = cur + (goal - cur) * (dt * 10.0).min(1.0);
         lt.rotation = Quat::from_rotation_x(a);
     }
-    // angezeigte Waffe
-    match display_h {
-        None => {
-            if let Some(d) = mbox.display.take() {
-                commands.entity(d).despawn();
+    // angezeigte Waffe: fertige Modelle nur ein- und ausblenden
+    if display_h.is_none() {
+        mbox.shown = None;
+    } else if let Some(w) = want_weapon {
+        mbox.shown = Some(w);
+    }
+    for &(w, e) in &mbox.displays {
+        let show = mbox.shown == Some(w);
+        if let Ok(mut v) = vis.get_mut(e) {
+            let want = if show {
+                Visibility::Inherited
+            } else {
+                Visibility::Hidden
+            };
+            if *v != want {
+                *v = want;
             }
         }
-        Some(h) => {
-            if let Some(w) = want_weapon {
-                if let Some(d) = mbox.display.take() {
-                    commands.entity(d).despawn();
-                }
-                let e = commands
-                    .spawn((
-                        BoxDisplay,
-                        super::WorldWeapon,
-                        WorldAssetRoot(
-                            asset_server.load(GltfAssetLabel::Scene(0).from_asset(def(w).model())),
-                        ),
-                        Transform::from_xyz(0.0, h, 0.0)
-                            .with_rotation(Quat::from_rotation_y(PI / 2.0)),
-                        ChildOf(mbox.root),
-                    ))
-                    .observe(super::hide_weapon_hands)
-                    .id();
-                mbox.display = Some(e);
-            } else if let Some(d) = mbox.display {
-                if let Ok(mut dt_) = tfs.get_mut(d) {
-                    dt_.translation.y = h;
-                }
-            }
+        if let (true, Some(h)) = (show, display_h)
+            && let Ok(mut tf) = tfs.get_mut(e)
+        {
+            tf.translation.y = h;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::SeedableRng;
+
+    #[test]
+    fn tiers_follow_the_odds() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(7);
+        let mut counts = [0u32; 3];
+        let n = 20_000;
+        for _ in 0..n {
+            let w = roll_weapon(&[], &mut rng);
+            let tier = WEAPONS[w].box_tier;
+            assert_ne!(tier, BoxTier::None);
+            counts[match tier {
+                BoxTier::Bad => 0,
+                BoxTier::Medium => 1,
+                _ => 2,
+            }] += 1;
+        }
+        let share = |c: u32| c as f32 / n as f32;
+        assert!((share(counts[0]) - 0.4).abs() < 0.02, "{counts:?}");
+        assert!((share(counts[1]) - 0.4).abs() < 0.02, "{counts:?}");
+        assert!((share(counts[2]) - 0.2).abs() < 0.02, "{counts:?}");
+    }
+
+    #[test]
+    fn owned_weapons_are_never_offered() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(1);
+        let good: Vec<usize> = box_weapons()
+            .filter(|i| WEAPONS[*i].box_tier == BoxTier::Good)
+            .collect();
+        for _ in 0..2000 {
+            let w = roll_weapon(&good, &mut rng);
+            assert!(!good.contains(&w));
         }
     }
 }

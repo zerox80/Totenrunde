@@ -219,6 +219,7 @@ fn timed_actions(
     ingame: Option<Res<InGame>>,
     mut exit: MessageWriter<AppExit>,
     mut fps: Local<(u32, f32)>,
+    mut worst: Local<f32>,
 ) {
     if !cfg.active || ingame.is_none() {
         return;
@@ -230,6 +231,10 @@ fn timed_actions(
     if now > 10.0 {
         fps.0 += 1;
         fps.1 += time.delta_secs();
+    }
+    // Längster Frame nach den ersten Sekunden (Ruckler, z. B. beim Nachladen von Modellen)
+    if now > 3.0 {
+        *worst = worst.max(time.delta_secs());
     }
     let shots: Vec<String> = cfg
         .shots
@@ -248,6 +253,7 @@ fn timed_actions(
             if fps.1 > 0.0 {
                 info!("FPS-Mittel: {:.1}", fps.0 as f32 / fps.1);
             }
+            info!("Längster Frame: {:.0} ms", *worst * 1000.0);
             exit.write(AppExit::Success);
         }
     }

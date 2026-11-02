@@ -95,6 +95,9 @@ weapon.dsr50.pap = Martwa Cisza
 weapon.python.pap = Ukąszenie Żmii
 weapon.mgl.pap = Koniec Świata
 weapon.raygun.pap = Działo promieniowe X2
+weapon.skorpion.pap = Jadowite Żądło
+weapon.ksg.pap = Podwójne Pożegnanie
+weapon.an94.pap = Dzwon Pogrzebowy
 
 error.assets_missing = Nie znaleziono folderu „assets”:\n{path}\n\nRozpakuj całe pobrane archiwum i uruchom Totenrunde z rozpakowanego folderu.
 error.crashed = Totenrunde uległo awarii:\n\n{message}\n\nSzczegóły w:\n{path}

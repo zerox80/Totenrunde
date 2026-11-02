@@ -95,6 +95,9 @@ weapon.dsr50.pap = Dead Silence
 weapon.python.pap = Viper's Bite
 weapon.mgl.pap = Doomsday
 weapon.raygun.pap = Ray Cannon X2
+weapon.skorpion.pap = Venom Sting
+weapon.ksg.pap = Double Farewell
+weapon.an94.pap = Death Knell
 
 error.assets_missing = The "assets" folder was not found:\n{path}\n\nPlease extract the downloaded archive completely and start Totenrunde from the extracted folder.
 error.crashed = Totenrunde has crashed:\n\n{message}\n\nDetails are in:\n{path}
