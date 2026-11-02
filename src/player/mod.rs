@@ -10,7 +10,7 @@ use bevy::prelude::*;
 
 use crate::base::{AppState, GameSet, InGame};
 
-pub use health::{GameOverFlag, Health, PlayerDamage};
+pub use health::{GameOverFlag, Health, PlayerDamage, Revived};
 pub use spawn::spawn_player;
 
 pub struct PlayerPlugin;
@@ -18,6 +18,7 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<PlayerDamage>()
+            .add_message::<Revived>()
             .init_resource::<GameOverFlag>()
             .add_systems(OnEnter(AppState::Playing), spawn_player)
             .add_systems(
@@ -30,7 +31,11 @@ impl Plugin for PlayerPlugin {
             )
             .add_systems(
                 Update,
-                (health::player_health, movement::push_from_zombies)
+                (
+                    health::player_health,
+                    health::respawn_on_round,
+                    movement::push_from_zombies,
+                )
                     .in_set(GameSet::World)
                     .after(crate::zombies::ZombieSystems)
                     .run_if(in_state(AppState::Playing))

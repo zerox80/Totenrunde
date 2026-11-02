@@ -6,7 +6,10 @@ Zonen:
   2 Werkstatt            – Strom-Schalter, Doppelschuss, Pump-Gun
   3 Diner                – Panzer-Tonikum, AK-74u
   4 Umspannwerk          – Waffen-Verstärker, Maultier-Malz, Ausdauer-Limo
-Rundlauf: Hof -> Werkstatt -> Umspannwerk -> Diner -> Hof.
+  5 Busdepot (West)      – Halle mit abgestellten Bussen, Skorpion, Kiste
+  6 Gleisfeld (Ost)      – Gleise, Güterwagen, Bahnsteig, KSG, Kiste
+Rundlauf: Hof -> Werkstatt -> Umspannwerk -> Diner -> Hof; Busdepot und Gleisfeld gehen
+direkt vom Hof ab.
 
 Statische Geometrie bekommt gebackenes Licht (Lightmaps, siehe maps/lightmap.py).
 Aufruf: tools/blender.sh blender/maps/endstation.py [-- nobake]
@@ -364,8 +367,9 @@ D.wall_decal(6.15, 9.0, 1.7, 0.0, (0.6, 0.75), "poster_ad")
 # ======================================================================================
 F.fence((-20, -10), (-8, -10))
 F.fence((8, -10), (20, -10))
-F.fence((-20, -10), (-20, 6))
-F.fence((20, -10), (20, 6))
+F.fence((-20, 4), (-20, 6))  # Rest der Westseite übernimmt die Wand des Busdepots
+F.fence((20, -10), (20, -4.6))  # Durchgang zum Gleisfeld (Schutt 6)
+F.fence((20, -1.4), (20, 6))
 F.fence((-6, 6), (6, 6))
 F.rubble(-3.0, 6.8, r=1.6, h=1.2, collide=False)
 F.rubble(2.5, 7.5, r=1.4, h=1.0, collide=False)
@@ -442,13 +446,152 @@ for (x, y) in ((-9.5, 24.6), (10.0, 23.0), (12.5, 28.6)):
 D.scatter_floor(-13.5, 20.5, 19.5, 32.5, 0.012, 18, ["debris", "grime", "paper"], size=(0.5, 1.2))
 D.floor_decal(3.0, 23.0, 1.4, "blood_pool", z=0.012)
 
+
+# ======================================================================================
+# Zone 5: Busdepot (Halle westlich vom Hof)
+# ======================================================================================
+H5 = 6.0
+M.floor(-38, -16, -20, 4, "concrete_floor", z=0.02, t=0.05)
+M.box_mm((-38.2, -16.2, H5), (-19.8, 4.2, H5 + 0.15), "metal_grey", collide=True)
+M.box_mm((-38.4, -16.4, H5 + 0.15), (-19.6, 4.4, H5 + 0.35), "rust", collide=False)
+DOOR5 = dict(s=13.0, w=3.4, lo=0.0, hi=3.6, kind="door", door=5)
+M.wall((-20, -16), (-20, 4), H5, "brick_dark", "brick", openings=[DOOR5], inside_left=True, bands=WALL_SHOP)
+M.wall((-38, 4), (-38, -16), H5, "brick_dark", "brick", openings=[F.window_spec(5.0), F.window_spec(13.0)], inside_left=True, bands=WALL_SHOP)
+M.wall((-38, -16), (-20, -16), H5, "brick_dark", "brick", openings=[F.window_spec(9.0)], inside_left=True, bands=WALL_SHOP)
+M.wall((-20, 4), (-38, 4), H5, "brick_dark", "brick", inside_left=True, bands=WALL_SHOP)
+# Fachwerkbinder unter dem Dach und Oberlichter
+for y in (-13.0, -8.0, -3.0, 2.0):
+    M.box((-29.0, y, 5.6), (17.9, 0.18, 0.14), "metal_dark", collide=False)
+    M.box((-29.0, y, 4.9), (17.9, 0.12, 0.1), "metal_dark", collide=False)
+    for k in range(9):
+        M.box((-37.0 + k * 2.0, y, 5.25), (0.08, 0.08, 0.7), "metal_dark", collide=False)
+for x in (-34.0, -29.0, -24.0):
+    M.box((x, -6.0, 5.75), (0.12, 19.8, 0.16), "rust", collide=False)
+# Abgestellte Busse in zwei Spuren, Ölflecken in den Gruben-Markierungen
+F.bus_wreck(-33.0, -6.0, 0.0)
+F.bus_wreck(-27.5, -7.5, 0.0, color="paint_yellow", stripe="metal_red")
+for x in (-33.0, -27.5):
+    M.box((x, -6.5, 0.025), (0.12, 13.0, 0.005), "paint_yellow", collide=False)
+    D.floor_decal(x, -4.0, 2.4, "oil", z=0.025)
+    D.floor_decal(x + 0.4, -10.0, 1.6, "oil", z=0.025)
+# Werkbank, Regale, Reifen und Fässer an den Wänden
+F.workbench(-37.3, -5.5, -90.0)
+F.shelf(-36.8, 3.4, 180.0, 2.4, 2.2, 0.6)
+F.shelf(-31.5, 3.4, 180.0, 2.4, 2.2, 0.6)
+F.tire_stack(-23.0, 3.0, 4)
+F.tire_stack(-22.2, 2.6, 3)
+F.tire_stack(-37.2, -14.8, 3)
+D.barrel(-21.0, -15.0, "metal_red")
+D.barrel(-21.7, -15.2, "metal_blue")
+D.barrel(-21.2, -14.4, "metal_yellow", tipped=True)
+D.pallet(-25.0, -15.0)
+D.crate(-25.0, -15.0, z=0.15, s=0.9)
+D.crate(-24.0, -15.1, s=0.6, yaw=20)
+# Licht: Hallenstrahler (Strom nötig), zwei Notleuchten, Arbeitslampe
+for (x, y) in ((-33.0, -12.0), (-27.5, -12.0), (-33.0, 0.0), (-27.5, 0.0)):
+    D.pendant(x, y, H5, drop=1.6, kind="cold", needs_power=True, intensity=80000.0, rng=18.0)
+F.ceiling_lamp(-21.0, -8.0, 4.2, "red", intensity=14000.0, rng=9.0, flicker=0.25)
+F.ceiling_lamp(-37.0, -10.0, 4.2, "warm", intensity=16000.0, rng=10.0)
+M.add_light((-37.2, -5.5, 1.7), (1.0, 0.75, 0.45), 9000.0, 5.0)
+D.sign("BUSDEPOT", (-20.0 + 0.17, 0.5, 4.6), 0.0, 3.0, 0.5, "sign_blue", "text_white", size=0.3)
+D.sign("WERKSTATTBEREICH", (-37.83, -5.5, 2.9), 0.0, 1.8, 0.3, "sign_yellow", "text_black", size=0.12)
+D.scatter_floor(-37.5, -15.5, -20.5, 3.5, 0.025, 26, ["debris", "grime", "paper", "oil"], size=(0.4, 1.2))
+D.floor_decal(-24.0, -6.0, 1.6, "blood_pool", z=0.025)
+D.floor_decal(-23.2, -4.8, 1.1, "footprints", z=0.025, spin=120)
+D.wall_decal(-37.85, -12.0, 3.5, 0.0, (2.0, 2.0), "leak")
+D.wall_decal(-26.0, -15.85, 1.8, 90.0, (1.4, 1.4), "graffiti")
+
+# ======================================================================================
+# Zone 6: Gleisfeld (östlich vom Hof)
+# ======================================================================================
+M.floor(20, -16, 40, 5, "gravel", z=0.01, t=0.05, group="ground")
+F.fence((20, -16), (40, -16))
+F.fence((40, -16), (40, 5))
+F.fence((40, 5), (20, 5))
+F.fence((20, -16), (20, -10))
+
+
+def track(x, y0, y1):
+    """Gleis: zwei Schienen auf Holzschwellen über einem Schotterbett."""
+    M.box((x, (y0 + y1) / 2, 0.04), (3.0, y1 - y0, 0.06), "gravel", collide=False)
+    n = int((y1 - y0) / 0.65)
+    for k in range(n):
+        M.box((x, y0 + 0.3 + k * 0.65, 0.1), (2.5, 0.24, 0.12), "wood_dark", collide=False)
+    for sx in (-0.72, 0.72):
+        M.box((x + sx, (y0 + y1) / 2, 0.22), (0.07, y1 - y0, 0.12), "metal_dark", collide=False)
+        M.box((x + sx, (y0 + y1) / 2, 0.285), (0.1, y1 - y0, 0.025), "chrome", collide=False)
+
+
+track(26.0, -40.0, 30.0)
+track(31.5, -40.0, 30.0)
+# Güterwagen auf Gleis 1 (rostig, Schiebetür halb offen) mit Drehgestellen
+GW = (26.0, -6.0)
+M.box((GW[0], GW[1], 2.25), (2.9, 12.0, 2.9), "rust", collide=False, bevel=0.04)
+M.box((GW[0], GW[1], 3.75), (2.7, 11.8, 0.12), "metal_dark", collide=False)
+for sy in (-4.2, 4.2):
+    M.box((GW[0], GW[1] + sy, 0.55), (2.4, 2.6, 0.5), "metal_dark", collide=False)
+    for wy in (-0.75, 0.75):
+        for wx in (-0.72, 0.72):
+            M.cyl((GW[0] + wx, GW[1] + sy + wy, 0.42), 0.42, 0.12, "metal_dark", axis="X", seg=16, collide=False)
+for k in range(9):
+    for sx in (-1.47, 1.47):
+        M.box((GW[0] + sx, GW[1] - 5.6 + k * 1.4, 2.25), (0.05, 0.08, 2.8), "rust", collide=False)
+M.box((GW[0] + 1.48, GW[1] + 0.8, 2.1), (0.04, 2.6, 2.4), "soot", collide=False)
+M.box((GW[0] + 1.52, GW[1] - 0.6, 2.1), (0.06, 1.8, 2.5), "rust", collide=False)
+M.collider((GW[0], GW[1], 2.0), (3.0, 12.2, 4.0), 0.0, F_ALL)
+D.text("DB-CARGO 31 80", (GW[0] - 1.48, GW[1] + 2.0, 3.2), 180.0, 0.25, "text_white", extrude=0.003)
+# Flachwagen mit Kisten auf Gleis 2 (zum Teil außerhalb des Zauns)
+FW = (31.5, -14.0)
+M.box((FW[0], FW[1], 1.05), (2.8, 10.0, 0.3), "metal_dark", collide=False)
+for sy in (-3.5, 3.5):
+    M.box((FW[0], FW[1] + sy, 0.55), (2.3, 2.4, 0.5), "metal_dark", collide=False)
+M.collider((FW[0], FW[1], 0.7), (2.9, 10.2, 1.4), 0.0, F_ALL)
+D.crate(FW[0] - 0.6, FW[1] + 1.5, z=1.2, s=1.1, collide=False)
+D.crate(FW[0] + 0.5, FW[1] + 2.0, z=1.2, s=0.9, yaw=15, collide=False)
+D.crate(FW[0], FW[1] - 2.0, z=1.2, s=1.2, yaw=-8, collide=False)
+# Bahnsteig an der Ostseite (niedrig genug zum Hinaufgehen) mit Unterstand
+PL = 0.3
+M.box_mm((34.0, -14.0, 0.0), (39.6, 3.5, PL), "concrete", collide=True)
+M.box_mm((34.0, -14.0, PL), (34.35, 3.5, PL + 0.01), "paint_yellow", collide=False)
+# Unterstand auf dem Bahnsteig: Pfosten, Dach, Glasrückwand, Bank
+for py in (-3.6, -0.4):
+    for px in (38.3, 39.3):
+        M.box((px, py, PL + 1.25), (0.08, 0.08, 2.5), "metal_dark", collide=False)
+        M.collider((px, py, PL + 1.25), (0.12, 0.12, 2.5), 0.0, F_PLAYER | F_ZOMBIE)
+M.box((38.8, -2.0, PL + 2.55), (1.5, 3.6, 0.08), "metal_grey", collide=False)
+M.box((39.35, -2.0, PL + 1.5), (0.03, 3.2, 1.6), "glass", collide=False)
+M.collider((39.35, -2.0, PL + 1.25), (0.1, 3.2, 2.5), 0.0, F_PLAYER | F_ZOMBIE)
+M.box((39.0, -2.0, PL + 0.45), (0.45, 2.6, 0.06), "wood_dark", collide=False)
+for py in (-3.0, -1.0):
+    M.box((39.0, py, PL + 0.22), (0.4, 0.06, 0.44), "metal_dark", collide=False)
+D.sign("GLEIS 2", (36.0, 3.3, 2.4), -90.0, 1.2, 0.3, "sign_blue", "text_white", size=0.14)
+M.cyl((36.0, 3.4, 1.3), 0.04, 2.6, "metal_grey", seg=8, collide=False)
+# Wand mit Fahrplan (dort hängt die Wandwaffe)
+M.box_mm((39.45, -12.0, PL), (39.75, -8.0, 2.8), "concrete", collide=True)
+D.wall_decal(39.44, -9.0, 1.9, 180.0, (0.9, 1.1), "poster_ad")
+# Signalmast, Schaltkasten und Flutlichtmast
+M.cyl((29.0, 3.0, 2.2), 0.08, 4.4, "metal_dark", seg=10, flags=F_PLAYER | F_ZOMBIE)
+M.box((29.0, 3.0, 4.2), (0.5, 0.25, 0.9), "metal_dark", collide=False)
+for (z, mat) in ((4.45, "lamp_red"), (4.15, "lamp_dead"), (3.85, "lamp_dead")):
+    M.cyl((29.0, 2.86, z), 0.1, 0.04, mat, axis="Y", seg=12, collide=False)
+M.add_light((29.0, 2.4, 4.45), (1.0, 0.2, 0.1), 6000.0, 6.0, flicker=0.2)
+M.box((38.6, 4.4, 0.7), (0.9, 0.6, 1.4), "metal_green", collide=True, bevel=0.03)
+M.cyl((37.5, -14.5, 4.5), 0.12, 9.0, "metal_grey", seg=10, flags=F_PLAYER | F_ZOMBIE)
+M.box((37.5, -14.5, 9.0), (1.6, 0.3, 0.5), "metal_dark", collide=False)
+for k in (-0.5, 0.0, 0.5):
+    M.box((37.5 + k, -14.35, 8.95), (0.4, 0.05, 0.35), "lamp_cold", collide=False)
+M.add_light((33.0, -8.0, 8.5), (0.82, 0.9, 1.0), 220000.0, 26.0)
+D.street_lamp(22.5, 2.5, -90.0, "flicker", intensity=60000.0)
+D.scatter_floor(20.5, -15.5, 39.5, 4.5, 0.03, 22, ["debris", "grime", "paper"], size=(0.5, 1.2))
+D.floor_decal(24.0, -1.0, 1.4, "blood_pool", z=0.03)
+
 # ======================================================================================
 # Außenbereich (nicht begehbar, Atmosphäre)
 # ======================================================================================
-for i, (x, y) in enumerate(((-28, -15), (-31, 8), (-26, 25), (28, -14), (31, 6), (27, 26), (-18, 42), (10, 44), (36, -32), (-36, -30), (-24, -8), (25, 18), (-30, 30))):
+for i, (x, y) in enumerate(((-28, -22), (-31, 8), (-26, 25), (28, -21), (31, 7), (27, 26), (-18, 42), (10, 44), (36, -32), (-36, -30), (-43, -6), (25, 18), (-30, 30))):
     D.dead_tree(x, y, h=rnd.uniform(5.0, 8.5), seed=i)
-F.car_wreck(-24.0, -4.0, 10.0)
-F.car_wreck(25.0, -6.0, 100.0, color="metal_red")
+F.car_wreck(-30.0, 12.0, 80.0)
+F.car_wreck(32.0, 12.0, 100.0, color="metal_red")
 F.car_wreck(-12.0, -30.0, 88.0)
 F.car_wreck(14.0, -31.0, 94.0, color="metal_blue")
 for x in (-40, -20, 0, 20, 40):
@@ -588,12 +731,54 @@ doors.append(
         "parts": [{"node": "Door_4_a", "to_pos": bv((8.7, 18.0, 0.0)), "to_yaw": bv_yaw(180.0 + 100.0)}],
     }
 )
+# Tor 5: Rolltor Hof -> Busdepot (Wand x=-20, Öffnung y in [-4.7, -1.3])
+roll5 = MB("Door_5_a", uv_scale=1.0)
+for k in range(12):
+    roll5.box((0, 0, 0.15 + k * 0.3), (3.4, 0.08, 0.28), L["metal_grey"])
+roll5.box((0, 0.05, 0.05), (3.4, 0.1, 0.1), L["metal_dark"])
+obj = roll5.to_object(name="Door_5_a")
+obj.location = (-20.0, -3.0, 0.0)
+obj.rotation_euler = (0, 0, math.radians(90.0))
+M.objects.append(obj)
+doors.append(
+    {
+        "id": 5,
+        "cost": 1250,
+        "kind": "door",
+        "zones": [1, 5],
+        "prompt": bv((-20.0, -3.0, 1.2)),
+        "parts": [{"node": "Door_5_a", "to_pos": bv((-20.0, -3.0, 3.5)), "to_yaw": bv_yaw(90.0)}],
+    }
+)
+# Schutt 6: Hof -> Gleisfeld (Zaunlücke bei x=20, y in [-4.6, -1.4])
+deb6 = MB("Debris_6", uv_scale=1.5)
+for i in range(12):
+    deb6.ico((rnd.uniform(-0.6, 0.6), rnd.uniform(-1.4, 1.4), rnd.uniform(0.2, 1.5)), rnd.uniform(0.3, 0.65), L["concrete_dark"],
+             subdiv=1, scale=(1.0, 1.3, 0.7), jitter=0.3, seed=80 + i)
+for i in range(5):
+    deb6.box((rnd.uniform(-0.5, 0.5), rnd.uniform(-1.2, 1.2), rnd.uniform(0.3, 2.2)), (0.15, rnd.uniform(1.5, 2.6), 0.1), L["planks"],
+             rot=(rnd.uniform(-30, 30), rnd.uniform(-20, 20), rnd.uniform(-40, 40)))
+deb6.box((0.0, 0.4, 0.5), (0.9, 1.0, 1.0), L["metal_red"], rot=(0, 0, 15))
+obj = deb6.to_object(name="Debris_6")
+obj.location = (20.0, -3.0, 0.0)
+M.objects.append(obj)
+M.collider((20.0, -3.0, 1.7), (1.6, 3.2, 3.4), 0.0, F_ALL, kind="door", door=6)
+doors.append(
+    {
+        "id": 6,
+        "cost": 1000,
+        "kind": "debris",
+        "zones": [1, 6],
+        "prompt": bv((19.0, -3.0, 1.2)),
+        "parts": [{"node": "Debris_6", "to_pos": bv((20.0, -3.0, 6.0)), "to_yaw": 0.0}],
+    }
+)
 M.doors = doors
 
 # ======================================================================================
 # Gameplay-Daten
 # ======================================================================================
-M.nav = {"min": [-34.0, -46.0], "max": [34.0, 40.0], "cell": 0.5}
+M.nav = {"min": [-46.0, -46.0], "max": [44.0, 40.0], "cell": 0.5}
 M.player_start = {"pos": bv((0.0, -16.0, 0.05)), "yaw": 0.0}
 
 M.zone(0, "Wartehalle", [(-7.85, -21.85, 7.85, -10.15)], open_=True)
@@ -601,6 +786,8 @@ M.zone(1, "Busbahnhof", [(-19.85, -9.85, 19.85, 5.85)])
 M.zone(2, "Werkstatt", [(-19.85, 6.15, -6.15, 19.85)])
 M.zone(3, "Diner", [(6.15, 6.15, 19.85, 17.85)])
 M.zone(4, "Umspannwerk", [(-13.85, 20.15, 6.0, 32.85), (6.0, 18.15, 19.85, 32.85)])
+M.zone(5, "Busdepot", [(-37.85, -15.85, -20.15, 3.85)])
+M.zone(6, "Gleisfeld", [(20.15, -15.85, 39.85, 4.85)])
 
 # Barrikaden: Mittelpunkt der Öffnung, Blickrichtung nach innen
 barr = []
@@ -637,6 +824,9 @@ barricade(6, 2, -6.0, 13.0, (-1, 0), spawn_dist=3.5)
 barricade(7, 3, 20.0, 10.0, (-1, 0))
 barricade(8, 3, 20.0, 15.0, (-1, 0))
 barricade(9, 3, 6.0, 12.5, (1, 0), spawn_dist=3.5)
+barricade(10, 5, -38.0, -1.0, (1, 0))
+barricade(11, 5, -38.0, -9.0, (1, 0))
+barricade(12, 5, -29.0, -16.0, (0, 1))
 M.barricades = barr
 
 # Aufsteiger (Zombies kommen aus dem Boden)
@@ -644,6 +834,8 @@ for (x, y) in ((-12.0, -7.0), (-15.5, 4.0), (-1.0, 4.5), (5.0, -2.5), (13.5, -1.
     M.spawners.append({"zone": 1, "kind": "riser", "pos": bv((x, y, 0.0))})
 for (x, y) in ((-10.5, 23.0), (-6.5, 30.5), (2.0, 22.5), (7.5, 27.0), (15.5, 27.0), (14.5, 21.0), (-12.0, 29.0)):
     M.spawners.append({"zone": 4, "kind": "riser", "pos": bv((x, y, 0.0))})
+for (x, y) in ((22.5, -12.5), (23.0, -2.0), (29.0, -12.0), (29.0, -1.5), (23.5, 3.5), (33.5, 0.5), (22.5, -7.5)):
+    M.spawners.append({"zone": 6, "kind": "riser", "pos": bv((x, y, 0.0))})
 
 # Wandwaffen (Position an der Wand, Blick in den Raum)
 M.wallbuys = [
@@ -653,6 +845,8 @@ M.wallbuys = [
     {"weapon": "remington", "pos": bv((-6.16, 9.5, 1.55)), "yaw": bv_yaw(face(-1, 0))},
     {"weapon": "ak74u", "pos": bv((6.16, 15.5, 1.55)), "yaw": bv_yaw(face(1, 0))},
     {"weapon": "b23r", "pos": bv((-3.84, 29.5, 1.55)), "yaw": bv_yaw(face(1, 0))},
+    {"weapon": "skorpion", "pos": bv((-20.16, -12.5, 1.55)), "yaw": bv_yaw(face(-1, 0))},
+    {"weapon": "ksg", "pos": bv((39.44, -10.5, 1.55)), "yaw": bv_yaw(face(-1, 0))},
 ]
 
 # Perk-Automaten
@@ -672,6 +866,10 @@ M.box_spots = [
     {"pos": bv((6.65, 9.0, 0.02)), "yaw": bv_yaw(face(1, 0)), "start": False},
     {"pos": bv((-12.8, 24.5, 0.02)), "yaw": bv_yaw(face(1, 0)), "start": False},
     {"pos": bv((-0.5, -21.35, 0.02)), "yaw": bv_yaw(face(0, 1)), "start": False},
+    {"pos": bv((-37.2, -12.5, 0.02)), "yaw": bv_yaw(face(1, 0)), "start": False},
+    {"pos": bv((-23.0, 1.0, 0.02)), "yaw": bv_yaw(face(-1, 0)), "start": False},
+    {"pos": bv((38.6, -6.0, PL + 0.02)), "yaw": bv_yaw(face(-1, 0)), "start": False},
+    {"pos": bv((23.0, -14.6, 0.02)), "yaw": bv_yaw(face(0, 1)), "start": False},
 ]
 
 M.pap = {"pos": bv((0.0, 31.6, 0.02)), "yaw": bv_yaw(face(0, -1))}

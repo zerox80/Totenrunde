@@ -7,7 +7,9 @@ Das Spiel gibt es für **Windows**, **Linux** und den **Browser**. Der Browser-P
 WebAssembly und **WebGPU**, in älteren Browsern WebGL 2. Der Webserver liefert es per **HTTP/3 über QUIC/UDP** aus; der erste
 Aufruf läuft über HTTPS/TCP, das den Browser auf HTTP/3 umleitet.
 
-**Aktuell ist das Spiel Solo; Online-Multiplayer ist nicht enthalten.**
+Gespielt wird **solo** oder im **Koop mit bis zu vier Spielern** (Menü → *Multiplayer*). Für den
+Koop braucht jeder ein kostenloses Konto auf dem Server; Desktop- und Browser-Spieler können
+gemeinsam spielen.
 
 Sprachen: Deutsch, Englisch, Französisch, Spanisch, Italienisch, Portugiesisch, Niederländisch,
 Polnisch, Tschechisch, Türkisch, Russisch und Ukrainisch. Die Sprache folgt der Browser- bzw.
@@ -86,6 +88,22 @@ python3 backend/install.py --dry-run --non-interactive \
 
 Ausführliche Hilfe zu DNS, Ports, Certbot und Fehlern steht in `backend/README.md`.
 
+### Einstellungen (`backend/.env`)
+
+Der Installer legt `backend/.env` an; die Vorlage ist `.env.example`. Aktive Zeilen stehen ohne
+`#`, optionale sind auskommentiert und lassen sich durch Entfernen des `#` einschalten:
+
+| Einstellung | Bedeutung |
+|---|---|
+| `DOMAIN`, `TLS_SERVER_NAME`, `CERTBOT_EMAIL`, `CERT_DIR` | Domain und Let’s-Encrypt-Zertifikat |
+| `PORT` | Öffentlicher Port für HTTPS (TCP) und HTTP/3 (UDP), Standard 443 |
+| `IMAGE`, `TAG` | Container-Image und Version |
+| `#MULTIPLAYER=0` | Koop-Multiplayer abschalten (Standard: an) |
+| `#DATA_DIR=./data` | Konten in einem Ordner statt im Docker-Volume speichern |
+
+Änderungen gelten nach `docker compose … up -d`. Ein erneuter Lauf des Installers übernimmt
+eingeschaltete optionale Werte.
+
 ### Server verwalten
 
 Diese Befehle werden im Repository-Stammverzeichnis ausgeführt:
@@ -106,6 +124,33 @@ docker compose --env-file backend/.env -f backend/compose.yaml up -d
 docker compose --env-file backend/.env -f backend/compose.yaml down
 ```
 
+## Multiplayer
+
+1. Im Hauptmenü **Multiplayer** wählen.
+2. Ohne Konto auf **Konto erstellen / Anmelden** klicken. Im Browser öffnet sich die Konto-Seite
+   (`/konto/`) mit einem Code. Dort registrieren oder anmelden, den Code mit dem eigenen Spiel
+   vergleichen und **Dieses Spiel verbinden** bestätigen. Im Browser-Spiel genügt die Anmeldung
+   auf der Konto-Seite derselben Domain.
+3. **Lobby erstellen** (öffentlich oder privat) oder einer offenen Lobby bzw. per
+   fünfstelligem Code beitreten. Sind alle **bereit**, startet der Host die Partie.
+
+Im Koop gilt die Abstimmung des Originals für mehrere Spieler (mehr und stärkere Zombies,
+Zweiter Atem kostet 1500). Wer fällt, liegt 45 Sekunden am Boden und kann von Mitspielern mit
+**F** wiederbelebt werden; wer ausblutet, kehrt zur nächsten Runde zurück. Liegen alle am
+Boden, ist die Partie vorbei. Die Konto-Seite zeigt eigene Statistik und eine Bestenliste.
+
+Die Desktop-Version verbindet sich mit dem Server aus `settings.json` (`"server":
+"https://spiel.example.de"`). Release-Builds können ihn über die Repository-Variable
+`TR_SERVER` fest eintragen; ohne Angabe gilt der lokale Entwicklungsserver
+`http://127.0.0.1:8080`.
+
+So funktioniert es: Alle Spiele halten eine WebSocket-Verbindung zum Server (`/api/mp/ws`). Der
+Server prüft Konten und Lobbys und reicht die Spieldaten weiter. Das Spiel des Hosts berechnet
+die Welt (Zombies, Runden, Türen, Strom, Kiste, Power-ups) und schickt 20-mal pro Sekunde einen
+Schnappschuss; jedes Spiel steuert seinen eigenen Spieler. Treffer melden die Spieler dem Host,
+der Schaden und Punkte berechnet. Käufe, die die Welt verändern, sind Anfragen an den Host –
+bezahlt wird erst mit seiner Zusage. Geht der Host, endet die Partie für alle.
+
 ## Steuerung
 
 | Eingabe | Aktion |
@@ -114,7 +159,7 @@ docker compose --env-file backend/.env -f backend/compose.yaml down
 | Maus | Zielen |
 | Linksklick / Rechtsklick | Schießen / Visier |
 | R / V / G | Nachladen / Messer / Granate |
-| F | Benutzen und kaufen |
+| F | Benutzen und kaufen, im Koop Mitspieler wiederbeleben |
 | Shift / Leertaste | Sprinten / Springen |
 | C / Strg oder Z | Ducken / Hinlegen |
 | 1–3, Mausrad oder Q | Waffe wechseln |
@@ -137,6 +182,9 @@ hyper + rustls (TCP) / Quinn + h3 (UDP)
 Axum-Server
   |-- Wasm und JavaScript
   |-- Spiel-Assets
+  |-- /konto/          Konto-Seite und Bestenliste
+  |-- /api/account/... Registrieren, Anmelden, Gerät verknüpfen
+  |-- /api/mp/ws       WebSocket: Lobbys und Spieldaten
   `-- /api/health
 
 Das Spiel wird im Browser ausgeführt und rendert über WebGPU (sonst WebGL 2) auf der GPU des
@@ -144,6 +192,11 @@ Spielers.
 ```
 
 Der Server stellt also das Spiel bereit; er berechnet nicht die 3D-Grafik für die Spieler.
+Für den Multiplayer verwaltet er zusätzlich Konten (SQLite in `/data`, Passwörter als
+Argon2-Hash) und Lobbys und leitet die Spieldaten weiter. Die Datenbank liegt im
+Compose-Volume `totenrunde-data` und bleibt bei Updates erhalten. Konten, Lobbys und
+Weiterleitung kommen aus dem [Multiplayer-SDK](https://github.com/zerox80/totenrunde-mp-sdk)
+(`totenrunde-mp-server`), die Verbindung im Spiel aus `totenrunde-mp-client`.
 Certbot verwaltet das TLS-Zertifikat auf dem Host. Docker startet den Server als
 unprivilegierter Benutzer. Nginx wird nicht benötigt.
 
@@ -158,13 +211,14 @@ src/                 Rust-/Bevy-Spielcode
   zombies/           Zombie-KI und Treffer
   game/              Runden, Punkte, Perks und Power-ups
   ui/                HUD und Menüs
+  net/               Koop-Multiplayer: Sitzung, Abgleich, Mitspieler-Figuren (Verbindung: SDK)
 assets/              Fertige Modelle, Texturen, Sounds und Karten
 backend/
   src/http3.rs       HTTP/3-Server über QUIC
   src/tcp.rs         HTTPS-Einstieg über TCP mit Alt-Svc
   src/tls.rs         Zertifikate laden
   src/main.rs        Axum-Routen und Dateiauslieferung
-  web/               Browser-Einstieg
+  web/               Browser-Einstieg und Konto-Seite (web/konto/)
   install.py         Geführter Server-Installer
   compose.yaml       Container-Konfiguration
   Dockerfile         Optimierter Wasm- und Server-Build
@@ -185,6 +239,27 @@ Backend prüfen:
 ```bash
 cargo clippy --locked --manifest-path backend/Cargo.toml -- -D warnings
 cargo test --locked --manifest-path backend/Cargo.toml
+```
+
+Multiplayer lokal testen – Server ohne TLS auf Port 8080 starten (ohne Zertifikate läuft dann
+nur dieser Zugang; die Datenbank landet in `backend/data/`):
+
+```bash
+HTTP_PORT=8080 cargo run --manifest-path backend/Cargo.toml
+```
+
+Danach zwei Spiele starten, im Menü *Multiplayer* wählen und die Konto-Seite unter
+`http://127.0.0.1:8080/konto/` benutzen. Für automatische Tests gibt es `TR_TOKEN`, `TR_MP=host`
+bzw. `TR_MP=join` und `TR_SERVER` (siehe `src/base/debug.rs`).
+
+Spiel und Server binden das Multiplayer-SDK per Git-Tag ein. Um das SDK gleichzeitig lokal zu
+ändern, es neben dieses Repository klonen und vorübergehend (nicht einchecken) in `Cargo.toml`
+und `backend/Cargo.toml` umlenken:
+
+```toml
+[patch."https://github.com/zerox80/totenrunde-mp-sdk"]
+totenrunde-mp-client = { path = "../totenrunde-mp-sdk/crates/client" }
+totenrunde-mp-protocol = { path = "../totenrunde-mp-sdk/crates/protocol" }
 ```
 
 Anleitungen für den manuellen Wasm-Build, lokale Protokolltests und Assets stehen in

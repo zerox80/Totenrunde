@@ -49,6 +49,9 @@ pub const ZOMBIE_MODELS: &[&str] = &["models/zombie_m.gltf", "models/zombie_f.gl
 #[derive(Resource)]
 pub struct GameAssets {
     pub zombies: Vec<Handle<Gltf>>,
+    /// Alle Waffen der Mysteriösen Kiste. Schon beim Laden geholt und dauerhaft gehalten:
+    /// sonst lädt die Kiste beim Rollen jedes Modell samt Texturen neu (Ruckeln).
+    pub weapons: Vec<Handle<Gltf>>,
     pub planks: Handle<Image>,
     pub font_bold: Handle<Font>,
     pub font_regular: Handle<Font>,
@@ -85,8 +88,14 @@ fn load_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
         .filter(|p| crate::world::mapdata::asset_exists(p))
         .map(|p| asset_server.load(*p))
         .collect();
+    let weapons = crate::game::interact::mystery_box::box_weapons()
+        .map(|w| crate::weapons::def(w).model())
+        .filter(|p| crate::world::mapdata::asset_exists(p))
+        .map(|p| asset_server.load(p))
+        .collect();
     commands.insert_resource(GameAssets {
         zombies,
+        weapons,
         planks: asset_server.load("textures/planks.png"),
         font_bold: asset_server.load("fonts/Montserrat-ExtraBold.otf"),
         font_regular: asset_server.load("fonts/Montserrat-SemiBold.otf"),
@@ -105,6 +114,7 @@ fn check_loaded(
     if assets
         .zombies
         .iter()
+        .chain(&assets.weapons)
         .any(|z| !asset_server.is_loaded_with_dependencies(z))
     {
         return;

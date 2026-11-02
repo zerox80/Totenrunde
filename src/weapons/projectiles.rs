@@ -8,7 +8,9 @@ use crate::audio::{Sfx, SfxEvent};
 use crate::fx::FxEvent;
 use crate::player::{Player, PlayerDamage};
 use crate::world::collision::{CollisionWorld, F_BULLET};
-use crate::zombies::{DamageKind, HitPart, Zombie, ZombieHit, ZombieRig, raycast_zombies};
+use crate::zombies::{
+    Attacker, DamageKind, HitPart, Zombie, ZombieHit, ZombieRig, raycast_zombies,
+};
 
 #[derive(Component)]
 pub struct ProjectileBody {
@@ -28,6 +30,15 @@ pub struct Tracer {
     pub life: f32,
 }
 
+/// Explosion des eigenen Spielers (für den Effekt bei den Mitspielern; Schaden rechnet der
+/// Host). `ray`: Strahlenpistole (aufgewertet?) statt Granate.
+#[derive(Message, Clone, Copy, Debug)]
+pub struct Blast {
+    pub pos: Vec3,
+    pub radius: f32,
+    pub ray: Option<bool>,
+}
+
 /// Explosion: Flächenschaden an Zombies (und am Spieler).
 #[allow(clippy::too_many_arguments)]
 pub fn explode(
@@ -41,9 +52,15 @@ pub fn explode(
     fx: &mut MessageWriter<FxEvent>,
     sfx: &mut MessageWriter<SfxEvent>,
     dmg: &mut MessageWriter<PlayerDamage>,
+    blasts: &mut MessageWriter<Blast>,
     big: bool,
 ) {
     fx.write(FxEvent::Explosion { pos, radius });
+    blasts.write(Blast {
+        pos,
+        radius,
+        ray: None,
+    });
     sfx.write(SfxEvent::at(Sfx::Explosion, pos).vol(if big { 1.0 } else { 0.6 }));
     for (e, z, tf, _) in zombies.iter() {
         if !z.alive() {
@@ -59,6 +76,7 @@ pub fn explode(
         }
         let k = 1.0 - (d / radius) * 0.7;
         hits.write(ZombieHit {
+            by: Attacker::Local,
             zombie: e,
             damage: damage * k,
             part: if d < radius * 0.3 {
@@ -96,6 +114,7 @@ pub fn update_projectiles(
     mut fx: MessageWriter<FxEvent>,
     mut sfx: MessageWriter<SfxEvent>,
     mut dmg: MessageWriter<PlayerDamage>,
+    mut blasts: MessageWriter<Blast>,
 ) {
     let dt = time.delta_secs();
     for (e, mut tr) in tracers.iter_mut() {
@@ -128,6 +147,7 @@ pub fn update_projectiles(
             if let Some(h) = zh.first() {
                 let point = start + dir * h.t;
                 hits.write(ZombieHit {
+                    by: Attacker::Local,
                     zombie: h.zombie,
                     damage: p.damage,
                     part: h.part,
@@ -179,6 +199,11 @@ pub fn update_projectiles(
                         pos: at,
                         upgraded: p.upgraded,
                     });
+                    blasts.write(Blast {
+                        pos: at,
+                        radius: p.splash,
+                        ray: Some(p.upgraded),
+                    });
                     sfx.write(SfxEvent::at(Sfx::Explosion, at).vol(0.35).pitch(1.6));
                     for (ze, z, ztf, _) in zombies.iter() {
                         if !z.alive() {
@@ -188,6 +213,7 @@ pub fn update_projectiles(
                         let d = (c - at).length();
                         if d < p.splash {
                             hits.write(ZombieHit {
+                                by: Attacker::Local,
                                 zombie: ze,
                                 damage: p.splash_damage * (1.0 - d / p.splash * 0.6),
                                 part: HitPart::Torso,
@@ -217,6 +243,7 @@ pub fn update_projectiles(
                         &mut fx,
                         &mut sfx,
                         &mut dmg,
+                        &mut blasts,
                         true,
                     );
                 }

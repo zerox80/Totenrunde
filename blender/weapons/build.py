@@ -30,6 +30,9 @@ BUILDERS = {
     "olympia": longguns.build_olympia,
     "remington": longguns.build_remington,
     "mgl": longguns.build_mgl,
+    "skorpion": longguns.build_skorpion,
+    "ksg": longguns.build_ksg,
+    "an94": longguns.build_an94,
     "knife": handguns.build_knife,
     "perk_bottle": handguns.build_perk_bottle,
 }

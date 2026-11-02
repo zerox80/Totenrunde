@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use super::{Focus, InteractKind, Prompt, cost_text, try_buy};
 use crate::audio::{Sfx, SfxEvent};
 use crate::base::i18n::{t, tf};
+use crate::game::balance::Balance;
 use crate::game::perks::Perks;
 use crate::game::points::Score;
 use crate::weapons::Loadout;
@@ -18,6 +19,7 @@ pub fn use_perk_machine(
     mut score: ResMut<Score>,
     mut perks: ResMut<Perks>,
     power: Res<Power>,
+    bal: Res<Balance>,
     mut lo: Single<&mut Loadout>,
     mut sfx: MessageWriter<SfxEvent>,
 ) {
@@ -35,11 +37,12 @@ pub fn use_perk_machine(
         prompt.set(t("prompt.perk_limit"));
         return;
     }
+    let cost = perk.cost_for(bal.players);
     prompt.set(tf(
         "prompt.buy",
-        &[("item", &perk.name()), ("cost", &cost_text(perk.cost()))],
+        &[("item", &perk.name()), ("cost", &cost_text(cost))],
     ));
-    if focus.pressed && lo.can_act() && try_buy(&mut score, perk.cost(), &mut sfx) {
+    if focus.pressed && lo.can_act() && try_buy(&mut score, cost, &mut sfx) {
         perks.drinking = Some((perk, DRINK_TIME));
         lo.busy(DRINK_TIME);
         sfx.write(SfxEvent::ui(Sfx::PerkDrink));

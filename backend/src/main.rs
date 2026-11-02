@@ -19,6 +19,7 @@ use axum::{
 };
 use serde_json::{Value, json};
 use tokio::sync::watch;
+use totenrunde_mp_server::{Db, Multiplayer};
 use tower_http::{
     compression::CompressionLayer,
     services::{ServeDir, ServeFile},
@@ -70,12 +71,61 @@ async fn main() -> Result<(), DynError> {
         None => {
             let web_root = configured_root("WEB_ROOT", "/app/web", local_web_root());
             let asset_root = configured_root("ASSET_ROOT", "/app/assets", local_asset_root());
+            let data_dir = configured_root("DATA_DIR", "/data", local_data_dir());
+            let database = data_dir.join("totenrunde.sqlite3");
+            // Multiplayer (Konten, Lobbys, Relay) aus dem SDK; mit MULTIPLAYER=0 abschaltbar
+            let multiplayer = if multiplayer_enabled() {
+                let db = Db::open(&database).map_err(|error| {
+                    format!("Datenbank {} nicht nutzbar: {error}", database.display())
+                })?;
+                println!(
+                    "Multiplayer an, Konten und Statistik: {}",
+                    database.display()
+                );
+                Some(Multiplayer::new(db))
+            } else {
+                println!("Multiplayer abgeschaltet (MULTIPLAYER=0)");
+                None
+            };
+            let app = router(web_root, asset_root, multiplayer);
+            let shutdown = shutdown_receiver();
+
+            // Optional HTTP ohne TLS für die lokale Entwicklung (z. B. HTTP_PORT=8080)
+            let plain = match env::var("HTTP_PORT") {
+                Ok(value) => {
+                    let address = SocketAddr::from((host, value.parse::<u16>()?));
+                    let listener = tokio::net::TcpListener::bind(address).await?;
+                    println!("Entwicklungszugang ohne TLS: http://{address}");
+                    Some(listener)
+                }
+                Err(_) => None,
+            };
+            let plain_app = app.clone();
+            let plain_shutdown = wait_for_shutdown(shutdown.clone());
+            let run_plain = async move {
+                match plain {
+                    Some(listener) => {
+                        tcp::run_plain_server(listener, plain_app, plain_shutdown).await
+                    }
+                    None => Ok(()),
+                }
+            };
+
+            let have_certificates = cert_path.is_file() && key_path.is_file();
+            if !have_certificates && env::var_os("HTTP_PORT").is_some() {
+                println!(
+                    "Keine Zertifikate unter {}: nur HTTP ohne TLS",
+                    cert_path.display()
+                );
+                return run_plain.await;
+            }
+
             let address = SocketAddr::from((host, port));
             let tls = tls::server_config(
                 tls::load_certificates(&cert_path)?,
                 tls::load_private_key(&key_path)?,
             )?;
-            let app = router(web_root, asset_root).layer(SetResponseHeaderLayer::overriding(
+            let app = app.layer(SetResponseHeaderLayer::overriding(
                 header::ALT_SVC,
                 HeaderValue::from_str(&format!("h3=\":{public_port}\"; ma=86400"))?,
             ));
@@ -86,10 +136,10 @@ async fn main() -> Result<(), DynError> {
                  HTTP/1.1 und HTTP/2 über TCP mit Alt-Svc auf Port {public_port}"
             );
 
-            let shutdown = shutdown_receiver();
             tokio::try_join!(
                 http3::run_server(endpoint, app.clone(), wait_for_shutdown(shutdown.clone())),
-                tcp::run_server(listener, tls, app, wait_for_shutdown(shutdown)),
+                tcp::run_server(listener, tls, app, wait_for_shutdown(shutdown.clone())),
+                run_plain,
             )?;
             Ok(())
         }
@@ -155,13 +205,24 @@ async fn shutdown_signal() {
     }
 }
 
-pub fn router(web_root: PathBuf, asset_root: PathBuf) -> Router {
+/// Multiplayer ist an, außer `MULTIPLAYER` steht auf 0/false/off/aus.
+fn multiplayer_enabled() -> bool {
+    env::var("MULTIPLAYER").map_or(true, |value| {
+        !matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "0" | "false" | "off" | "aus" | "nein" | "no"
+        )
+    })
+}
+
+pub fn router(web_root: PathBuf, asset_root: PathBuf, multiplayer: Option<Multiplayer>) -> Router {
     let index = web_root.join("index.html");
     let web = ServeDir::new(web_root)
         .append_index_html_on_directories(true)
         .fallback(ServeFile::new(index));
 
     Router::new()
+        .merge(multiplayer.map(Multiplayer::routes).unwrap_or_default())
         .route("/api/health", get(health))
         .route("/api/{*path}", any(api_not_found))
         .nest_service("/assets", ServeDir::new(asset_root))
@@ -281,6 +342,10 @@ fn local_web_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("web")
 }
 
+fn local_data_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data")
+}
+
 fn local_asset_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -303,7 +368,7 @@ mod tests {
     use serde_json::Value;
     use tower::ServiceExt;
 
-    use super::router;
+    use totenrunde_mp_server::{Db, Multiplayer};
 
     static NEXT_TEMP_DIR: AtomicU64 = AtomicU64::new(0);
 
@@ -332,6 +397,14 @@ mod tests {
     }
 
     use std::path::PathBuf;
+
+    pub fn router(web_root: PathBuf, asset_root: PathBuf) -> axum::Router {
+        super::router(
+            web_root,
+            asset_root,
+            Some(Multiplayer::new(Db::in_memory())),
+        )
+    }
 
     #[tokio::test]
     async fn health_returns_status_and_version() {

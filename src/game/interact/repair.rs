@@ -1,20 +1,23 @@
 //! Barrikaden reparieren: F gedrückt halten setzt Brett für Brett wieder ein
-//! (+10 Punkte pro Brett, wie im Original mit Obergrenze pro Runde).
+//! (+10 Punkte pro Brett, wie im Original mit Obergrenze pro Runde). Jedes Brett ist eine
+//! Anfrage an den Host; die Punkte gibt es mit seiner Zusage (siehe `requests`).
 
 use bevy::prelude::*;
 
 use super::{Focus, InteractKind, Interactable, Prompt};
-use crate::audio::{Sfx, SfxEvent};
 use crate::base::AppState;
 use crate::base::i18n::t;
 use crate::game::perks::{Perk, Perks};
 use crate::game::points::Score;
-use crate::game::powerups::ActivePowerups;
+use crate::game::requests::WorldRequest;
 use crate::game::rounds::Rounds;
+use crate::net::msg::Req;
+use crate::net::{Session, local_slot};
 use crate::world::barricades::Barricades;
 
 const REPAIR_TIME: f32 = 0.8;
-const ROUND_CAP: u32 = 500;
+/// Höchstens so viele Reparatur-Punkte pro Runde
+pub const ROUND_CAP: u32 = 500;
 
 pub fn spawn_repair_points(mut commands: Commands, bars: Res<Barricades>) {
     for b in &bars.list {
@@ -38,14 +41,14 @@ pub fn use_repair(
     time: Res<Time>,
     focus: Res<Focus>,
     mut prompt: ResMut<Prompt>,
-    mut bars: ResMut<Barricades>,
+    bars: Res<Barricades>,
     mut score: ResMut<Score>,
     perks: Res<Perks>,
-    powerups: Res<ActivePowerups>,
     rounds: Option<Res<Rounds>>,
+    session: Option<Res<Session>>,
     mut timer: Local<f32>,
     mut last_round: Local<u32>,
-    mut sfx: MessageWriter<SfxEvent>,
+    mut requests: MessageWriter<WorldRequest>,
 ) {
     let round = rounds.map(|r| r.round).unwrap_or(1);
     if round != *last_round {
@@ -56,7 +59,7 @@ pub fn use_repair(
         *timer = 0.0;
         return;
     };
-    let Some(b) = bars.list.iter_mut().find(|b| b.id == id) else {
+    let Some(b) = bars.list.iter().find(|b| b.id == id) else {
         return;
     };
     if b.missing_boards() == 0 {
@@ -76,13 +79,9 @@ pub fn use_repair(
     *timer += time.delta_secs();
     if *timer >= dur {
         *timer = 0.0;
-        if b.repair_one() {
-            sfx.write(SfxEvent::at(Sfx::BoardPlace, b.center + Vec3::Y * 1.3));
-            score.boards += 1;
-            if score.repair_points_round < ROUND_CAP {
-                let got = score.add(10, &powerups, None);
-                score.repair_points_round += got;
-            }
-        }
+        requests.write(WorldRequest {
+            by: local_slot(session.as_deref()),
+            req: Req::Repair(id as u8),
+        });
     }
 }

@@ -18,10 +18,20 @@ use crate::base::{AppState, GameSet, InGame};
 pub use defs::{WEAPONS, WeaponClass, def, weapon_index};
 pub use loadout::{
     GiveWeapon, Loadout, MAX_GRENADES, WState, WeaponSlot, enter_last_stand, leave_last_stand,
-    take_current,
+    starting_loadout, take_current,
 };
-pub use projectiles::explode;
+pub use projectiles::Blast;
 pub use viewmodel::VM_SCALE;
+
+/// Ein Schuss des eigenen Spielers (für Geräusch und Leuchtspur bei den Mitspielern).
+#[derive(Message, Clone, Copy, Debug)]
+pub struct ShotFired {
+    pub weapon: usize,
+    pub upgraded: bool,
+    pub origin: Vec3,
+    /// Ende der Leuchtspur (bei Projektilwaffen kurz vor der Mündung)
+    pub end: Vec3,
+}
 
 /// Alle Systeme, die Treffer erzeugen (Zombies werten danach den Schaden aus).
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
@@ -32,6 +42,8 @@ pub struct WeaponsPlugin;
 impl Plugin for WeaponsPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<GiveWeapon>()
+            .add_message::<ShotFired>()
+            .add_message::<Blast>()
             .add_systems(Startup, assets::setup_weapon_assets)
             .add_systems(
                 OnEnter(AppState::Playing),

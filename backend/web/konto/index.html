@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090b10">
+  <meta name="description" content="Totenrunde-Konto für den Koop-Multiplayer">
+  <title>Totenrunde – Konto</title>
+  <link rel="icon" type="image/png" href="/assets/ui/icon.png">
+  <link rel="stylesheet" href="./konto.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/">TOTENRUNDE</a>
+    <nav>
+      <a href="/" data-t="navPlay">Im Browser spielen</a>
+      <a href="#bestenliste" data-t="navBoard">Bestenliste</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="link-banner" class="banner" hidden>
+      <p class="eyebrow" data-t="linkEyebrow">Spiel verbinden</p>
+      <p class="code" id="link-code"></p>
+      <p id="link-text" data-t="linkText">Melde dich an oder erstelle ein Konto. Vergleiche danach den Code mit deinem eigenen Spiel und bestätige die Verbindung.</p>
+      <button type="button" class="primary" id="confirm-link" data-t="linkConfirm" hidden>Dieses Spiel verbinden</button>
+    </section>
+
+    <section id="link-done" class="banner ok" hidden>
+      <p class="eyebrow" data-t="linkDoneEyebrow">Verbunden</p>
+      <p data-t="linkDone">Dein Spiel ist jetzt angemeldet. Du kannst dieses Fenster schließen und zurück ins Spiel wechseln.</p>
+    </section>
+
+    <section id="signed-out" class="card" hidden>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tab-register" aria-selected="true" aria-controls="form-register" data-t="tabRegister">Konto erstellen</button>
+        <button type="button" role="tab" id="tab-login" aria-selected="false" aria-controls="form-login" data-t="tabLogin">Anmelden</button>
+      </div>
+
+      <form id="form-register" role="tabpanel" aria-labelledby="tab-register" novalidate>
+        <label for="reg-name" data-t="name">Spielername</label>
+        <input id="reg-name" name="name" autocomplete="username" required minlength="3" maxlength="16" pattern="[A-Za-z0-9_.\-]{3,16}" spellcheck="false">
+        <p class="hint" data-t="nameHint">3–16 Zeichen: Buchstaben, Ziffern, _ - .</p>
+        <label for="reg-pass" data-t="password">Passwort</label>
+        <input id="reg-pass" name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="128">
+        <p class="hint" data-t="passHint">Mindestens 8 Zeichen.</p>
+        <label for="reg-pass2" data-t="password2">Passwort wiederholen</label>
+        <input id="reg-pass2" name="password2" type="password" autocomplete="new-password" required minlength="8" maxlength="128">
+        <p class="error" role="alert" id="reg-error"></p>
+        <button type="submit" class="primary" data-t="register">Konto erstellen</button>
+      </form>
+
+      <form id="form-login" role="tabpanel" aria-labelledby="tab-login" novalidate hidden>
+        <label for="login-name" data-t="name">Spielername</label>
+        <input id="login-name" name="name" autocomplete="username" required spellcheck="false">
+        <label for="login-pass" data-t="password">Passwort</label>
+        <input id="login-pass" name="password" type="password" autocomplete="current-password" required>
+        <p class="error" role="alert" id="login-error"></p>
+        <button type="submit" class="primary" data-t="login">Anmelden</button>
+      </form>
+    </section>
+
+    <section id="signed-in" class="card" hidden>
+      <p class="eyebrow" data-t="profile">Dein Konto</p>
+      <h1 id="me-name"></h1>
+      <p class="hint" id="me-since"></p>
+      <dl class="stats" id="me-stats"></dl>
+      <div class="actions">
+        <a class="button primary" href="/" data-t="play">Jetzt spielen</a>
+        <button type="button" id="logout" data-t="logout">Abmelden</button>
+      </div>
+      <details class="danger">
+        <summary data-t="deleteTitle">Konto löschen</summary>
+        <form id="form-delete" novalidate>
+          <p data-t="deleteText">Löscht dein Konto mit allen Statistiken. Das lässt sich nicht rückgängig machen.</p>
+          <label for="del-pass" data-t="password">Passwort</label>
+          <input id="del-pass" type="password" autocomplete="current-password" required>
+          <p class="error" role="alert" id="del-error"></p>
+          <button type="submit" class="destructive" data-t="deleteButton">Endgültig löschen</button>
+        </form>
+      </details>
+    </section>
+
+    <section id="bestenliste" class="card">
+      <div class="board-head">
+        <h2 data-t="board">Bestenliste</h2>
+        <p class="hint" id="online"></p>
+      </div>
+      <p class="hint" data-t="boardHint">Höchste erreichte Runde in Koop-Partien, bei Gleichstand zählen die Kills.</p>
+      <table>
+        <thead>
+          <tr><th>#</th><th data-t="colName">Name</th><th data-t="colRound">Runde</th><th data-t="colKills">Kills</th><th data-t="colGames">Partien</th></tr>
+        </thead>
+        <tbody id="board"></tbody>
+      </table>
+      <p class="hint" id="board-empty" hidden data-t="boardEmpty">Noch keine Partien – sei die erste Gruppe auf der Liste!</p>
+    </section>
+  </main>
+
+  <footer>
+    <p data-t="footer">Für den Koop-Modus von Totenrunde. Gespeichert werden nur Name, Passwort-Hash und Spielstatistik.</p>
+  </footer>
+
+  <script type="module" src="./konto.js"></script>
+</body>
+</html>

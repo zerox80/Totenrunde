@@ -38,3 +38,6 @@ coverage/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Lokale Multiplayer-Datenbank (Entwicklung)
+backend/data/

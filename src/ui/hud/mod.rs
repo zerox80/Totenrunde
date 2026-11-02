@@ -3,6 +3,7 @@
 //!   * unten rechts: Punkte mit aufsteigenden Änderungen, Munition, Granaten, Waffenname
 //!   * unten Mitte: aktive Power-ups mit Restzeit, darüber der Hinweistext (Taste F)
 //!   * roter Bildschirmrand bei Schaden, Fadenkreuz, Fernrohrbild, FPS-Anzeige (F3)
+//!   * Koop: Punkte der Mitspieler, Meldungen, Hinweis am Boden
 
 mod ammo;
 mod damage;
@@ -11,6 +12,7 @@ mod powerups;
 mod prompt;
 mod round;
 mod scope;
+mod team;
 mod widgets;
 
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
@@ -36,6 +38,7 @@ impl Plugin for HudPlugin {
                     prompt::spawn,
                     damage::spawn,
                     scope::spawn,
+                    team::spawn,
                 ),
             )
             .add_systems(
@@ -52,6 +55,8 @@ impl Plugin for HudPlugin {
                     damage::update,
                     scope::update,
                     crosshair_visibility,
+                    (team::update_team, team::update_notices, team::update_downed)
+                        .run_if(crate::net::in_session),
                 )
                     .in_set(GameSet::Ui)
                     .run_if(in_state(AppState::Playing))
@@ -177,12 +182,14 @@ fn crosshair_visibility(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn debug_text(
     keys: Res<ButtonInput<KeyCode>>,
     mut show: ResMut<ShowFps>,
     mut settings: ResMut<crate::base::settings::Settings>,
     cfg: Res<crate::base::debug::DebugConfig>,
     diag: Res<DiagnosticsStore>,
+    render: Res<crate::base::render_scale::RenderInfo>,
     player: Query<(&Transform, &Player)>,
     mut text: Query<&mut Text, With<DebugText>>,
 ) {
@@ -198,7 +205,8 @@ fn debug_text(
     for mut t in text.iter_mut() {
         t.0 = if show.0 || cfg.active {
             format!(
-                "{fps:.0} FPS  pos {:.1} {:.1} {:.1}  yaw {:.0}",
+                "{fps:.0} FPS | {}  pos {:.1} {:.1} {:.1}  yaw {:.0}",
+                render.label(),
                 tf.translation.x,
                 tf.translation.y,
                 tf.translation.z,

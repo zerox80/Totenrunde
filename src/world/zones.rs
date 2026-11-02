@@ -1,11 +1,11 @@
-//! Zonen der Karte: welche Bereiche offen sind, wo der Spieler steht und welche Zonen
+//! Zonen der Karte: welche Bereiche offen sind, wo die Spieler stehen und welche Zonen
 //! gerade "aktiv" sind (dort spawnen Zombies).
 
 use bevy::prelude::*;
 
 use super::mapdata::MapFile;
 use crate::base::{AppState, GameSet, InGame};
-use crate::player::Player;
+use crate::game::survivors::Survivors;
 
 pub struct ZonesPlugin;
 
@@ -14,7 +14,7 @@ impl Plugin for ZonesPlugin {
         app.add_systems(OnEnter(AppState::Playing), init_zones)
             .add_systems(
                 Update,
-                track_player_zone
+                track_player_zones
                     .in_set(GameSet::World)
                     .run_if(in_state(AppState::Playing))
                     .run_if(resource_exists::<InGame>),
@@ -28,21 +28,22 @@ pub struct Zones {
     pub door_open: Vec<bool>,
     /// (Tür-ID, Zone A, Zone B)
     pub links: Vec<(u16, usize, usize)>,
-    pub player_zone: usize,
+    /// Zonen, in denen gerade ein Spieler steht (zuletzt bekannte, falls außerhalb)
+    pub player_zones: Vec<usize>,
 }
 
 impl Zones {
-    /// Zone des Spielers und alle über offene Türen angrenzenden Zonen.
+    /// Zonen der Spieler und alle über offene Türen angrenzenden Zonen.
     pub fn active_zones(&self) -> Vec<usize> {
-        let mut v = vec![self.player_zone];
+        let mut v = self.player_zones.clone();
         for (d, a, b) in &self.links {
             if !self.door_open.get(*d as usize).copied().unwrap_or(false) {
                 continue;
             }
-            if *a == self.player_zone && !v.contains(b) {
+            if self.player_zones.contains(a) && !v.contains(b) {
                 v.push(*b);
             }
-            if *b == self.player_zone && !v.contains(a) {
+            if self.player_zones.contains(b) && !v.contains(a) {
                 v.push(*a);
             }
         }
@@ -73,18 +74,20 @@ fn init_zones(mut commands: Commands, map: Res<MapFile>) {
         open,
         door_open: vec![false; max_door + 1],
         links,
-        player_zone,
+        player_zones: vec![player_zone],
     });
 }
 
-fn track_player_zone(
-    map: Res<MapFile>,
-    mut zones: ResMut<Zones>,
-    player: Single<&Transform, With<Player>>,
-) {
-    if let Some(z) = map.zone_at(player.translation) {
-        if zones.player_zone != z {
-            zones.player_zone = z;
-        }
+fn track_player_zones(map: Res<MapFile>, mut zones: ResMut<Zones>, survivors: Res<Survivors>) {
+    let mut now: Vec<usize> = survivors
+        .list
+        .iter()
+        .filter_map(|s| map.zone_at(s.pos))
+        .collect();
+    now.sort_unstable();
+    now.dedup();
+    // Außerhalb aller Zonen (Fensterbank, Sprung): letzte bekannte Zonen behalten
+    if !now.is_empty() && zones.player_zones != now {
+        zones.player_zones = now;
     }
 }

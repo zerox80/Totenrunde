@@ -1,4 +1,5 @@
-//! Pausenmenü (Esc im Spiel): Weiter, Hauptmenü, Beenden.
+//! Pausenmenü (Esc im Spiel): Weiter, Hauptmenü, Beenden. Im Koop läuft das Spiel dabei
+//! weiter; statt "Hauptmenü" gibt es "Partie verlassen".
 
 use bevy::prelude::*;
 
@@ -47,9 +48,28 @@ fn sync(
                         ..default()
                     },
                 ));
+                if game.multiplayer {
+                    p.spawn((
+                        text(
+                            t("pause.coop_hint"),
+                            &assets.font_regular,
+                            18.0,
+                            Color::srgba(1.0, 1.0, 1.0, 0.6),
+                        ),
+                        Translated("pause.coop_hint"),
+                        Node {
+                            margin: UiRect::bottom(px(20)),
+                            ..default()
+                        },
+                    ));
+                }
                 button(p, "pause.resume", MenuAction::Resume, &assets.font_bold);
                 super::graphics::open_button(p, &assets.font_bold);
-                button(p, "menu.main_menu", MenuAction::MainMenu, &assets.font_bold);
+                if game.multiplayer {
+                    button(p, "pause.leave", MenuAction::LeaveGame, &assets.font_bold);
+                } else {
+                    button(p, "menu.main_menu", MenuAction::MainMenu, &assets.font_bold);
+                }
                 button(p, "menu.quit", MenuAction::Quit, &assets.font_bold);
             });
     } else if !game.paused && shown {

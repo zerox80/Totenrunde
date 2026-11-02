@@ -4,10 +4,12 @@
 use bevy::prelude::*;
 
 use super::{Focus, InteractKind, Interactable, Prompt};
-use crate::audio::{Sfx, SfxEvent};
 use crate::base::AppState;
 use crate::base::debug::DebugConfig;
 use crate::base::i18n::t;
+use crate::game::requests::WorldRequest;
+use crate::net::msg::Req;
+use crate::net::{Session, local_slot};
 use crate::world::mapdata::{MapFile, asset_exists};
 use crate::world::power::Power;
 
@@ -99,18 +101,19 @@ pub fn spawn_power_switch(
 pub fn use_power_switch(
     mut focus: ResMut<Focus>,
     mut prompt: ResMut<Prompt>,
-    mut power: ResMut<Power>,
-    time: Res<Time>,
-    mut sfx: MessageWriter<SfxEvent>,
+    power: Res<Power>,
+    session: Option<Res<Session>>,
+    mut requests: MessageWriter<WorldRequest>,
 ) {
     if focus.kind != Some(InteractKind::Power) || power.on {
         return;
     }
     prompt.set(t("prompt.power"));
     if focus.pressed {
-        power.on = true;
-        power.since = time.elapsed_secs();
-        sfx.write(SfxEvent::ui(Sfx::PowerOn));
+        requests.write(WorldRequest {
+            by: local_slot(session.as_deref()),
+            req: Req::Power,
+        });
         focus.pressed = false;
     }
 }

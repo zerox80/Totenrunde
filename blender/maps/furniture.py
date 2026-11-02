@@ -86,38 +86,116 @@ def lamp_post(x, y, yaw=0.0, working=True, flicker=0.0, power=False):
         M.add_light((x + hx, y + hy, 5.9), (1.0, 0.72, 0.42), 120000.0, 14.0, flicker=flicker, power=power)
 
 
+def local_ext(ox, oy, yaw, pts, width, mat, lx=0.0, z=0.0):
+    """Seitenprofil (lokal: a = vorn, b = oben) quer extrudiert, um lx zur Seite versetzt."""
+    M.mb(mat).extrude(pts, width, M.lib[mat], plane="YZ", offset=lx, rot=(0, 0, yaw), center=(ox, oy, z), uv=M.lib.uv[mat])
+
+
+def local_cyl(ox, oy, yaw, lx, ly, lz, r, h, mat, seg=16):
+    """Quer liegender Zylinder (Achse lokal X), z. B. Räder."""
+    dx, dy = rot2(lx, ly, yaw)
+    M.cyl((ox + dx, oy + dy, lz), r, h, mat, axis="X", rot=(0, 0, yaw), seg=seg, collide=False)
+
+
+def wheel(ox, oy, yaw, lx, ly, r, w, rim="metal_grey"):
+    """Reifen mit Felge und Nabe (lx > 0: rechte Seite)."""
+    side = 1.0 if lx >= 0 else -1.0
+    local_cyl(ox, oy, yaw, lx, ly, r, r, w, "rubber", seg=20)
+    local_cyl(ox, oy, yaw, lx + side * 0.012, ly, r, r * 0.6, w, rim, seg=16)
+    local_cyl(ox, oy, yaw, lx + side * 0.02, ly, r, r * 0.18, w, "metal_dark", seg=10)
+
+
 def car_wreck(x, y, yaw, color="rust"):
-    # Fahrgestell + Karosserie + ausgebrannte Kabine
-    local_box(x, y, yaw, 0, 0, 0.55, 1.8, 4.3, 0.6, color, collide=False, bevel=0.06)
-    local_box(x, y, yaw, 0, -0.3, 1.1, 1.6, 2.1, 0.55, color, collide=False, bevel=0.08)
-    local_box(x, y, yaw, 0, -0.3, 1.1, 1.62, 1.9, 0.38, "soot", collide=False)
-    for wx in (-0.85, 0.85):
-        for wy in (-1.35, 1.35):
-            dx, dy = rot2(wx, wy, yaw)
-            M.cyl((x + dx, y + dy, 0.33), 0.33, 0.22, "rubber", axis="X", rot=(0, 0, yaw), seg=12, collide=False)
-    c = abs(math.cos(math.radians(yaw)))
-    s = abs(math.sin(math.radians(yaw)))
+    """Verlassene Limousine: Seitenprofil mit Haube, schrägen Scheiben und Kofferraum,
+    dunkle Scheiben mit Säulen in Wagenfarbe, Radkästen, Felgen, Stoßstangen, Lichter.
+    Manchen fehlt ein Rad."""
+    def ext(pts, width, mat, lx=0.0):
+        local_ext(x, y, yaw, pts, width, mat, lx)
+
+    def lb(lx, ly, lz, sx, sy, sz, mat, bevel=0.0):
+        local_box(x, y, yaw, lx, ly, lz, sx, sy, sz, mat, collide=False, bevel=bevel)
+
+    # Karosserie bis zur Gürtellinie
+    ext([(-2.22, 0.33), (2.2, 0.33), (2.26, 0.5), (2.22, 0.7), (1.98, 0.79), (1.05, 0.9), (-1.3, 0.94), (-2.14, 0.9),
+         (-2.26, 0.74), (-2.26, 0.45)], 1.76, color)
+    # Fahrgastzelle: Scheiben dunkel, Dach und Säulen in Wagenfarbe
+    ext([(-1.28, 0.92), (1.02, 0.89), (0.42, 1.36), (-0.62, 1.38)], 1.5, "window_dark")
+    ext([(-0.66, 1.37), (0.46, 1.35), (0.4, 1.42), (-0.6, 1.44)], 1.55, color)
+    for side in (-1, 1):
+        lx = side * 0.75
+        ext([(0.98, 0.89), (1.06, 0.9), (0.47, 1.37), (0.39, 1.37)], 0.05, color, lx)
+        ext([(-0.14, 0.92), (-0.03, 0.92), (-0.03, 1.38), (-0.14, 1.38)], 0.05, color, lx)
+        ext([(-1.32, 0.93), (-1.1, 0.93), (-0.57, 1.38), (-0.68, 1.38)], 0.05, color, lx)
+        # Spiegel, Türfugen und Griffe
+        lb(side * 0.95, 0.86, 0.98, 0.16, 0.07, 0.1, color)
+        for ly in (0.95, -0.05, -1.15):
+            lb(side * 0.882, ly, 0.62, 0.012, 0.02, 0.5, "soot")
+        for ly in (0.3, -0.75):
+            lb(side * 0.885, ly, 0.78, 0.02, 0.16, 0.03, "metal_dark")
+    # Radkästen (dunkle Öffnung hinter den Rädern) und Räder
+    for ly in (1.36, -1.36):
+        local_cyl(x, y, yaw, 0.0, ly, 0.36, 0.41, 1.78, "soot", seg=20)
+    missing = rnd.randrange(6)
+    for i, (lx, ly) in enumerate([(-0.78, 1.36), (0.78, 1.36), (-0.78, -1.36), (0.78, -1.36)]):
+        if i != missing:
+            wheel(x, y, yaw, lx, ly, 0.33, 0.24)
+    # Stoßstangen, Grill, Scheinwerfer, Rückleuchten, Kennzeichen
+    lb(0, 2.25, 0.42, 1.8, 0.14, 0.2, "metal_dark", bevel=0.04)
+    lb(0, -2.27, 0.44, 1.8, 0.14, 0.2, "metal_dark", bevel=0.04)
+    lb(0, 2.255, 0.63, 0.9, 0.04, 0.14, "metal_dark")
+    for side in (-1, 1):
+        lb(side * 0.62, 2.245, 0.66, 0.36, 0.04, 0.12, "glass")
+        lb(side * 0.66, -2.265, 0.76, 0.36, 0.04, 0.12, "metal_red")
+    lb(0, -2.36, 0.5, 0.5, 0.02, 0.12, "paint_white")
     M.collider((x, y, 0.7), (1.9, 4.4, 1.4), yaw, F_ALL)
 
 
-def bus_wreck(x, y, yaw):
-    length, width, height = 11.0, 2.6, 3.0
-    local_box(x, y, yaw, 0, 0, 0.75, width, length, 0.9, "rust", collide=False, bevel=0.05)  # Unterbau
-    # Seitenwände mit Fensteröffnungen (Pfosten)
+def bus_wreck(x, y, yaw, color="metal_white", stripe="metal_blue"):
+    """Stadtbus: Unterbau, Fensterband mit Holmen, schräge Frontscheibe mit Zielanzeige,
+    Türen, Klimaanlage auf dem Dach, Räder mit Felgen und Radkästen."""
+    length, width = 11.0, 2.55
+    hl = length / 2
+
+    def lb(lx, ly, lz, sx, sy, sz, mat, bevel=0.0):
+        local_box(x, y, yaw, lx, ly, lz, sx, sy, sz, mat, collide=False, bevel=bevel)
+
+    lb(0, -0.05, 0.75, width, length - 0.1, 0.8, color, bevel=0.05)  # Unterbau
+    lb(0, 0, 0.42, width - 0.1, length - 0.3, 0.12, "metal_dark")  # Schweller
+    lb(0, -0.05, 1.08, width + 0.01, length - 0.12, 0.16, stripe)  # Zierstreifen
+    lb(0, -0.1, 1.95, width - 0.06, length - 0.4, 1.3, "window_dark")  # Fensterband
     for side in (-1, 1):
-        local_box(x, y, yaw, side * (width / 2 - 0.04), 0, 2.85, 0.08, length, 0.3, "rust", collide=False)
         for i in range(9):
-            py = -length / 2 + 0.3 + i * (length - 0.6) / 8
-            local_box(x, y, yaw, side * (width / 2 - 0.04), py, 2.0, 0.09, 0.14, 1.4, "rust", collide=False)
-    local_box(x, y, yaw, 0, 0, 3.02, width, length, 0.06, "rust", collide=False)  # Dach
-    local_box(x, y, yaw, 0, 0, 1.22, width - 0.2, length - 0.2, 0.04, "soot", collide=False)  # Boden innen
-    local_box(x, y, yaw, 0, length / 2 - 0.04, 2.0, width, 0.08, 1.4, "soot", collide=False)
-    local_box(x, y, yaw, 0, -length / 2 + 0.04, 2.0, width, 0.08, 1.4, "rust", collide=False)
-    for wy in (-3.4, 3.4):
-        for wx in (-1.15, 1.15):
-            dx, dy = rot2(wx, wy, yaw)
-            M.cyl((x + dx, y + dy, 0.5), 0.5, 0.3, "rubber", axis="X", rot=(0, 0, yaw), seg=14, collide=False)
-    M.collider((x, y, 1.5), (width, length, 3.0), yaw, F_ALL)
+            py = -hl + 0.45 + i * (length - 1.4) / 8
+            lb(side * (width / 2 - 0.02), py, 1.95, 0.05, 0.14, 1.32, color)
+        lb(side * (width / 2 - 0.02), -0.1, 1.27, 0.06, length - 0.4, 0.08, "chrome")
+    lb(0, -0.05, 2.78, width, length - 0.1, 0.36, color, bevel=0.04)  # Oberband
+    lb(0, -0.05, 2.98, width - 0.1, length - 0.3, 0.08, color, bevel=0.03)  # Dach
+    lb(0, 1.6, 3.16, 1.6, 2.4, 0.3, "metal_grey", bevel=0.05)  # Klimaanlage
+    lb(0, -4.4, 3.1, 1.2, 1.2, 0.18, "metal_grey")
+    # Front: leicht geneigt, große Scheibe, Zielanzeige, Scheinwerfer, Stoßstange
+    local_ext(x, y, yaw, [(hl - 0.1, 0.35), (hl, 0.35), (hl + 0.04, 1.2), (hl - 0.02, 2.98), (hl - 0.1, 2.98)], width, color)
+    local_ext(x, y, yaw, [(hl + 0.035, 1.25), (hl + 0.07, 1.25), (hl + 0.02, 2.55), (hl - 0.01, 2.55)], width - 0.2, "window_dark")
+    lb(0, hl + 0.0, 2.76, 1.7, 0.06, 0.26, "screen_black")
+    for side in (-1, 1):
+        lb(side * 0.95, hl + 0.06, 0.78, 0.32, 0.04, 0.14, "glass")
+        lb(side * 1.38, hl - 0.25, 2.2, 0.08, 0.08, 0.5, "metal_dark")  # Spiegelarm
+        lb(side * 1.42, hl - 0.25, 1.9, 0.06, 0.18, 0.32, "metal_dark")  # Spiegel
+    lb(0, hl + 0.06, 0.45, width, 0.16, 0.22, "metal_dark", bevel=0.04)
+    lb(0, -hl - 0.02, 0.45, width, 0.16, 0.22, "metal_dark", bevel=0.04)
+    lb(0, -hl - 0.03, 2.0, width - 0.3, 0.04, 0.9, "window_dark")
+    for side in (-1, 1):
+        lb(side * 1.0, -hl - 0.04, 0.95, 0.24, 0.04, 0.3, "metal_red")
+    # Türen rechts (Glasflügel mit Rahmen)
+    for dy in (hl - 1.0, 0.4):
+        lb(width / 2 + 0.005, dy, 1.6, 0.03, 1.15, 2.45, "metal_dark")
+        for k in (-0.27, 0.27):
+            lb(width / 2 + 0.02, dy + k, 1.75, 0.02, 0.48, 1.9, "window_dark")
+    # Radkästen und Räder (hinten Zwillingsreifen)
+    for ly in (hl - 1.95, -2.9):
+        local_cyl(x, y, yaw, 0.0, ly, 0.5, 0.6, width + 0.004, "soot", seg=22)
+        for lx in (-(width / 2 - 0.12), width / 2 - 0.12):
+            wheel(x, y, yaw, lx, ly, 0.5, 0.32)
+    M.collider((x, y, 1.5), (width + 0.1, length + 0.1, 3.0), yaw, F_ALL)
 
 
 def bus_shelter(x, y, yaw):

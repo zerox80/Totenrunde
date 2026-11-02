@@ -5,6 +5,9 @@
 //!   in den ersten Runden prozentual reduziert
 //! * Spawn-Verzögerung: 2 s, pro Runde x0.95 (min. 0.08 s), max. 24 gleichzeitig
 //! * Tempo: Rundenwert·8 (Solo ·6) + Zufall entscheidet über Gehen / Laufen / Sprinten
+//!
+//! Im Koop zählt und spawnt nur der Host; die anderen erfahren Rundenbeginn und -ende als
+//! Nachricht ([`RoundStarted`], [`RoundEnded`]) und den Rest über den Schnappschuss.
 
 use bevy::prelude::*;
 use rand::Rng;
@@ -18,7 +21,9 @@ use crate::base::debug::DebugConfig;
 use crate::base::{AppState, GameSet, InGame};
 use crate::fx::FxEvent;
 use crate::game::points::Score;
-use crate::player::{GameOverFlag, Player};
+use crate::game::survivors::Survivors;
+use crate::net::{in_session, is_authority};
+use crate::player::GameOverFlag;
 use crate::weapons::{Loadout, MAX_GRENADES};
 use crate::world::barricades::Barricades;
 use crate::world::mapdata::MapFile;
@@ -31,10 +36,18 @@ pub struct RoundsPlugin;
 
 impl Plugin for RoundsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::Playing), reset_rounds)
+        app.add_message::<RoundStarted>()
+            .add_message::<RoundEnded>()
+            .add_systems(OnEnter(AppState::Playing), reset_rounds)
             .add_systems(
                 Update,
-                (round_logic, count_kills, game_over_check)
+                (
+                    (round_logic, count_kills).chain().run_if(is_authority),
+                    coop_game_over.run_if(is_authority).run_if(in_session),
+                    on_round_started,
+                    on_round_ended,
+                    game_over_check,
+                )
                     .chain()
                     .in_set(GameSet::World)
                     .run_if(in_state(AppState::Playing))
@@ -42,6 +55,14 @@ impl Plugin for RoundsPlugin {
             );
     }
 }
+
+/// Eine neue Runde hat begonnen (Rundennummer).
+#[derive(Message, Clone, Copy, Debug)]
+pub struct RoundStarted(pub u32);
+
+/// Die letzte Runde ist geschafft, die Pause beginnt.
+#[derive(Message, Clone, Copy, Debug)]
+pub struct RoundEnded;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum RoundPhase {
@@ -131,8 +152,7 @@ fn start_round(
     bal: &Balance,
     now: f32,
     pu: &mut ActivePowerups,
-    lo: &mut Loadout,
-    sfx: &mut MessageWriter<SfxEvent>,
+    started: &mut MessageWriter<RoundStarted>,
 ) {
     r.round += 1;
     r.to_spawn = zombie_count(r.round, bal.players);
@@ -143,8 +163,7 @@ fn start_round(
     r.phase = RoundPhase::Active;
     r.changed_at = now;
     powerups::new_round(pu);
-    lo.grenades = (lo.grenades + 2).min(MAX_GRENADES);
-    sfx.write(SfxEvent::ui(Sfx::RoundStart));
+    started.write(RoundStarted(r.round));
     info!(
         "Runde {} beginnt: {} Zombies, {} HP",
         r.round,
@@ -165,20 +184,20 @@ fn round_logic(
     barricades: Res<Barricades>,
     anims: Res<ZombieAnims>,
     zombies: Query<&Zombie>,
-    player: Single<(&Transform, &mut Loadout), With<Player>>,
+    survivors: Res<Survivors>,
     mut pu: ResMut<ActivePowerups>,
     mut sfx: MessageWriter<SfxEvent>,
     mut fx: MessageWriter<FxEvent>,
     mut score: ResMut<Score>,
+    (mut started, mut ended): (MessageWriter<RoundStarted>, MessageWriter<RoundEnded>),
 ) {
     let dt = time.delta_secs();
-    let (ptf, mut lo) = player.into_inner();
     let now = game.time;
     match rounds.phase {
         RoundPhase::Intro { t } => {
             let t = t + dt;
             if t >= 2.0 {
-                start_round(&mut rounds, &bal, now, &mut pu, &mut lo, &mut sfx);
+                start_round(&mut rounds, &bal, now, &mut pu, &mut started);
             } else {
                 rounds.phase = RoundPhase::Intro { t };
             }
@@ -187,7 +206,7 @@ fn round_logic(
             let t = t + dt;
             if t >= 11.0 {
                 score.repair_points_round = 0;
-                start_round(&mut rounds, &bal, now, &mut pu, &mut lo, &mut sfx);
+                start_round(&mut rounds, &bal, now, &mut pu, &mut started);
             } else {
                 rounds.phase = RoundPhase::Intermission { t };
             }
@@ -197,17 +216,17 @@ fn round_logic(
             if rounds.to_spawn == 0 && alive == 0 && pu.nuke_queue.is_empty() {
                 rounds.phase = RoundPhase::Intermission { t: 0.0 };
                 rounds.changed_at = now;
-                sfx.write(SfxEvent::ui(Sfx::RoundEnd));
+                ended.write(RoundEnded);
                 return;
             }
             rounds.spawn_cd -= dt;
             if rounds.to_spawn > 0 && alive < MAX_ALIVE && rounds.spawn_cd <= 0.0 {
                 let mut rng = rand::rng();
-                if let Some(si) = pick_spawner(&map, &zones, &barricades, ptf.translation, &mut rng)
-                {
+                if let Some(si) = pick_spawner(&map, &zones, &barricades, &survivors, &mut rng) {
                     let sp = &map.spawners[si];
                     let pos = Vec3::from_array(sp.pos);
-                    let to_player = ptf.translation - pos;
+                    let target = survivors.nearest(pos).map(|s| s.pos).unwrap_or(pos);
+                    let to_player = target - pos;
                     let yaw = (-to_player.x).atan2(-to_player.z);
                     let class = speed_class(rounds.round, bal.speed_per_round, &mut rng);
                     let (state, start_pos) = if sp.kind == "riser" {
@@ -227,6 +246,7 @@ fn round_logic(
                             state,
                             health: zombie_health(rounds.round) * bal.zombie_health,
                             class,
+                            look: None,
                         },
                     );
                     rounds.to_spawn -= 1;
@@ -244,6 +264,31 @@ fn round_logic(
 fn count_kills(mut killed: MessageReader<ZombieKilled>, mut rounds: ResMut<Rounds>) {
     for _ in killed.read() {
         rounds.killed_this_round += 1;
+    }
+}
+
+/// Bei allen Spielern: Ansage und zwei Granaten zum Rundenbeginn.
+fn on_round_started(
+    mut events: MessageReader<RoundStarted>,
+    mut lo: Single<&mut Loadout>,
+    mut sfx: MessageWriter<SfxEvent>,
+) {
+    for _ in events.read() {
+        lo.grenades = (lo.grenades + 2).min(MAX_GRENADES);
+        sfx.write(SfxEvent::ui(Sfx::RoundStart));
+    }
+}
+
+fn on_round_ended(mut events: MessageReader<RoundEnded>, mut sfx: MessageWriter<SfxEvent>) {
+    for _ in events.read() {
+        sfx.write(SfxEvent::ui(Sfx::RoundEnd));
+    }
+}
+
+/// Koop: Liegen alle am Boden (oder sind tot), ist das Spiel vorbei.
+fn coop_game_over(survivors: Res<Survivors>, mut over: ResMut<GameOverFlag>) {
+    if !over.0 && survivors.all_down() {
+        over.0 = true;
     }
 }
 

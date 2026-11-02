@@ -1,5 +1,6 @@
 //! Zombie-KI als Zustandsautomat: aus dem Boden steigen, zum Fenster laufen, Bretter
-//! abreißen, durchklettern, dem Spieler folgen (Flow-Field), angreifen, sterben.
+//! abreißen, durchklettern, dem nächsten Spieler folgen (Flow-Field), angreifen, sterben.
+//! Im Koop jagt jeder Zombie den nächsten stehenden Spieler; am Boden liegende ignoriert er.
 
 use std::f32::consts::PI;
 
@@ -8,7 +9,7 @@ use rand::Rng;
 
 use super::{ATTACK_RANGE, SpeedClass, ZOMBIE_RADIUS, ZState, Zombie};
 use crate::game::balance::Balance;
-use crate::player::{Player, PlayerDamage};
+use crate::game::survivors::{SurvivorDamage, Survivors};
 use crate::world::barricades::Barricades;
 use crate::world::collision::{CollisionWorld, F_ZOMBIE};
 use crate::world::nav::{NavGrid, UNREACHABLE};
@@ -40,24 +41,28 @@ pub fn zombie_ai(
     nav: Res<NavGrid>,
     mut barricades: ResMut<Barricades>,
     bal: Res<Balance>,
-    player: Single<(&Transform, &Player), Without<Zombie>>,
+    survivors: Res<Survivors>,
     mut zombies: Query<(Entity, &mut Zombie, &mut Transform)>,
-    mut dmg: MessageWriter<PlayerDamage>,
+    mut dmg: MessageWriter<SurvivorDamage>,
     mut commands: Commands,
 ) {
     let dt = time.delta_secs();
-    if dt <= 0.0 {
+    if dt <= 0.0 || survivors.list.is_empty() {
         return;
     }
-    let (ptf, pl) = *player;
-    let ppos = ptf.translation;
-    let player_downed = pl.frozen;
     let mut rng = rand::rng();
 
     for (e, mut z, mut tf) in zombies.iter_mut() {
         z.attack_cd = (z.attack_cd - dt).max(0.0);
         z.flinch = (z.flinch - dt * 4.0).max(0.0);
         let mut pos = tf.translation;
+        // Ziel: nächster stehender Spieler; liegen alle, schlurfen die Zombies zum nächsten
+        let target = survivors.nearest_active(pos);
+        let player_downed = target.is_none();
+        let ppos = target
+            .or_else(|| survivors.nearest(pos))
+            .map(|s| s.pos)
+            .unwrap_or(pos);
         let state = z.state;
         match state {
             ZState::Rising { t } => {
@@ -115,8 +120,13 @@ pub fn zombie_ai(
                 z.yaw = turn_towards(z.yaw, yaw_of(inward), dt * 4.0);
                 z.vel = Vec3::ZERO;
                 // Spieler nah am Fenster? Dann durchs Fenster schlagen
-                let pd = Vec3::new(ppos.x - bar.center.x, 0.0, ppos.z - bar.center.z).length();
-                if pd < 1.6 && z.attack_cd <= 0.0 && tearing <= 0.0 && !player_downed {
+                let pd = survivors
+                    .nearest_active(bar.center)
+                    .map(|s| {
+                        Vec3::new(s.pos.x - bar.center.x, 0.0, s.pos.z - bar.center.z).length()
+                    })
+                    .unwrap_or(f32::INFINITY);
+                if pd < 1.6 && z.attack_cd <= 0.0 && tearing <= 0.0 {
                     z.state = ZState::Attacking {
                         t: 0.0,
                         hit: false,
@@ -245,14 +255,21 @@ pub fn zombie_ai(
                 let mut hit = hit;
                 if !hit && t >= 0.45 {
                     hit = true;
-                    let reach = if let Some(b) = window {
-                        let c = barricades.list[b].center;
-                        Vec3::new(ppos.x - c.x, 0.0, ppos.z - c.z).length() < 1.8
-                    } else {
-                        to.length() < ATTACK_RANGE + 0.45 && (ppos.y - pos.y).abs() < 1.4
+                    let victim = match window {
+                        Some(b) => {
+                            let c = barricades.list[b].center;
+                            survivors.nearest_active(c).filter(|s| {
+                                Vec3::new(s.pos.x - c.x, 0.0, s.pos.z - c.z).length() < 1.8
+                            })
+                        }
+                        None => target.filter(|s| {
+                            let to = Vec3::new(s.pos.x - pos.x, 0.0, s.pos.z - pos.z);
+                            to.length() < ATTACK_RANGE + 0.45 && (s.pos.y - pos.y).abs() < 1.4
+                        }),
                     };
-                    if reach && !player_downed {
-                        dmg.write(PlayerDamage {
+                    if let Some(victim) = victim {
+                        dmg.write(SurvivorDamage {
+                            slot: victim.slot,
                             amount: bal.zombie_damage,
                             from: pos,
                         });

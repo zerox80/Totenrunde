@@ -1,5 +1,6 @@
 //! Start per Doppelklick: Fehler erscheinen als Meldungsfenster (es gibt kein Terminal) und
-//! landen in `totenrunde-absturz.txt` neben dem Spiel; dazu Prüfung der Assets und Fenster-Icon.
+//! landen in `totenrunde-absturz.txt` neben dem Spiel; dazu Prüfung der Assets, Fenster-Icon
+//! und Webseiten im Browser öffnen.
 
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -166,4 +167,36 @@ pub fn set_window_icon(mut done: Local<bool>, _main: NonSendMarker) {
             win.set_window_icon(Some(icon.clone()));
         }
     });
+}
+
+/// Öffnet eine Webseite im Standardbrowser (im Browser-Spiel in einem neuen Tab).
+pub fn open_url(url: &str) {
+    #[cfg(target_arch = "wasm32")]
+    if let Some(window) = web_sys::window() {
+        if window
+            .open_with_url_and_target_and_features(url, "_blank", "noopener")
+            .is_err()
+        {
+            bevy::log::warn!("Seite konnte nicht geöffnet werden: {url}");
+        }
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use std::process::Command;
+        let result = if cfg!(windows) {
+            // "start" ist ein Befehl der Shell; der leere Titel verhindert, dass die Adresse
+            // als Fenstertitel gelesen wird
+            Command::new("cmd")
+                .args(["/C", "start", ""])
+                .arg(url)
+                .spawn()
+        } else if cfg!(target_os = "macos") {
+            Command::new("open").arg(url).spawn()
+        } else {
+            Command::new("xdg-open").arg(url).spawn()
+        };
+        if let Err(error) = result {
+            bevy::log::warn!("Browser konnte nicht gestartet werden ({url}): {error}");
+        }
+    }
 }

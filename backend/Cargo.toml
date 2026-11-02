@@ -2,7 +2,7 @@
 name = "totenrunde-web"
 version = "0.1.0"
 edition = "2024"
-description = "Statischer Web-Server und Health-API für den Totenrunde-Wasm-Port"
+description = "Web-Server für den Totenrunde-Wasm-Port mit Konten, Lobbys und Multiplayer-Relay"
 
 [dependencies]
 axum = "0.8"
@@ -18,8 +18,12 @@ rustls-pemfile = "2"
 serde_json = "1"
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
+# Konten, Lobbys und Relay des Koop-Multiplayers
+totenrunde-mp-server = { git = "https://github.com/zerox80/totenrunde-mp-sdk", tag = "v0.1.0" }
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["compression-br", "compression-gzip", "fs", "set-header"] }
 
 [dev-dependencies]
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 rcgen = "0.13"
+tokio-tungstenite = "0.30"

@@ -38,6 +38,10 @@ pub struct Settings {
     pub show_fps: bool,
     /// Sprachcode (siehe `i18n::LANGUAGES`) oder "auto" für Browser-/Systemsprache
     pub language: String,
+    /// Multiplayer-Server (Desktop), z. B. "https://spiel.example.de"; leer = Standard
+    pub server: String,
+    /// Sitzung des verknüpften Kontos (vom Server ausgestellt)
+    pub mp_token: Option<String>,
 }
 
 /// Übersetzungsschlüssel der Grafikstufen
@@ -71,6 +75,8 @@ impl Default for Settings {
             vsync: true,
             show_fps: false,
             language: "auto".into(),
+            server: String::new(),
+            mp_token: None,
         }
     }
 }

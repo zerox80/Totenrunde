@@ -1,9 +1,9 @@
-//! Steuerung: Flow-Field zum Spieler aktualisieren, Zombies voneinander trennen.
+//! Steuerung: Flow-Field zu den Spielern aktualisieren, Zombies voneinander trennen.
 
 use bevy::prelude::*;
 
 use super::{ZOMBIE_RADIUS, ZState, Zombie};
-use crate::player::Player;
+use crate::game::survivors::Survivors;
 use crate::world::collision::{CollisionWorld, F_ZOMBIE};
 use crate::world::nav::NavGrid;
 
@@ -14,16 +14,17 @@ pub fn update_flow(
     time: Res<Time>,
     mut timer: ResMut<FlowTimer>,
     mut nav: ResMut<NavGrid>,
-    player: Single<&Transform, With<Player>>,
+    survivors: Res<Survivors>,
 ) {
     timer.0 -= time.delta_secs();
-    let cell = nav.index_of(player.translation);
-    if timer.0 <= 0.0
-        || nav.goal_cell.is_none()
-        || (cell.is_some() && cell != nav.goal_cell && timer.0 < 0.15)
-    {
+    let goals = survivors.goals();
+    let moved = goals
+        .iter()
+        .map(|g| nav.index_of(*g))
+        .any(|cell| cell.is_some() && !nav.goal_cells.contains(&cell.unwrap_or(usize::MAX)));
+    if timer.0 <= 0.0 || nav.goal_cells.is_empty() || (moved && timer.0 < 0.15) {
         timer.0 = 0.25;
-        nav.compute_flow(player.translation);
+        nav.compute_flow(&goals);
     }
 }
 
@@ -31,9 +32,8 @@ pub fn update_flow(
 pub fn zombie_separation(
     mut zombies: Query<(Entity, &Zombie, &mut Transform)>,
     col: Res<CollisionWorld>,
-    player: Single<&Transform, (With<Player>, Without<Zombie>)>,
+    survivors: Res<Survivors>,
 ) {
-    let ppos = player.translation;
     let list: Vec<(Entity, Vec3)> = zombies
         .iter()
         .filter(|(_, z, _)| matches!(z.state, ZState::Chasing | ZState::Attacking { .. }))
@@ -58,11 +58,13 @@ pub fn zombie_separation(
                 push += Vec3::new((e.index_u32() % 7) as f32 * 0.01 - 0.03, 0.0, 0.02);
             }
         }
-        let d = Vec3::new(p.x - ppos.x, 0.0, p.z - ppos.z);
-        let l = d.length();
-        let min = ZOMBIE_RADIUS + crate::player::RADIUS;
-        if l < min && l > 1e-4 {
-            push += d / l * (min - l);
+        for s in &survivors.list {
+            let d = Vec3::new(p.x - s.pos.x, 0.0, p.z - s.pos.z);
+            let l = d.length();
+            let min = ZOMBIE_RADIUS + crate::player::RADIUS;
+            if l < min && l > 1e-4 {
+                push += d / l * (min - l);
+            }
         }
         if push != Vec3::ZERO {
             let mut np = p + push;
