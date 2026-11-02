@@ -42,8 +42,6 @@ impl Plugin for BasePlugin {
             ));
         #[cfg(not(target_arch = "wasm32"))]
         app.add_systems(Update, platform::set_window_icon);
-        if render_scale::enabled() {
-            app.add_plugins(render_scale::RenderScalePlugin);
-        }
+        app.add_plugins(render_scale::RenderScalePlugin);
     }
 }
