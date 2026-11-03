@@ -75,16 +75,27 @@ pub fn load_sounds(mut commands: Commands, asset_server: Res<AssetServer>) {
     });
 }
 
+/// Gleichzeitige Stimmen, ab denen beiläufige Geräusche (`Sfx::droppable`) ausfallen. Im
+/// Browser mischt cpal im Hauptthread (WebAudio-Timer), und der Aufwand wächst mit jeder
+/// Stimme; auf dem Desktop mischt ein eigener Thread, dort gibt es keine Grenze.
+const MAX_VOICES: usize = if cfg!(target_arch = "wasm32") {
+    16
+} else {
+    usize::MAX
+};
+
 pub fn play_sfx(
     mut commands: Commands,
     lib: Option<Res<SfxLib>>,
     mut events: MessageReader<SfxEvent>,
+    playing: Query<(), With<AudioPlayer>>,
 ) {
     let Some(lib) = lib else {
         events.clear();
         return;
     };
     let mut rng = rand::rng();
+    let mut voices = playing.iter().count();
     for ev in events.read() {
         let Some(list) = lib.map.get(&ev.sfx) else {
             continue;
@@ -92,6 +103,10 @@ pub fn play_sfx(
         if list.is_empty() {
             continue;
         }
+        if voices >= MAX_VOICES && ev.sfx.droppable() {
+            continue;
+        }
+        voices += 1;
         let h = list[rng.random_range(0..list.len())].clone();
         let j = ev.sfx.pitch_jitter();
         let pitch = ev.pitch
