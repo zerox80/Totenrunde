@@ -182,6 +182,42 @@ fn crosshair_visibility(
     }
 }
 
+/// Bildzeiten der letzten Sekunde für die F3-Anzeige. Der Mittelwert der FPS verschweigt
+/// einzelne lange Bilder, und die sind das Ruckeln: Auf einem 160-Hz-Bildschirm kostet schon
+/// ein Bild über 6,25 ms einen Takt.
+#[derive(Default)]
+struct FrameStats {
+    /// laufender Durchschnitt der Bildzeit (ms), Maßstab für "langes Bild"
+    average: f32,
+    elapsed: f32,
+    worst: f32,
+    slow: u32,
+    /// zuletzt abgeschlossene Sekunde: (längstes Bild in ms, Anzahl langer Bilder)
+    shown: (f32, u32),
+}
+
+impl FrameStats {
+    fn record(&mut self, frame_ms: f32) {
+        self.average = if self.average == 0.0 {
+            frame_ms
+        } else {
+            self.average + (frame_ms - self.average) * 0.05
+        };
+        self.worst = self.worst.max(frame_ms);
+        // über der anderthalbfachen Durchschnittszeit: ein verpasster Takt
+        if frame_ms > self.average * 1.5 {
+            self.slow += 1;
+        }
+        self.elapsed += frame_ms / 1000.0;
+        if self.elapsed >= 1.0 {
+            self.shown = (self.worst, self.slow);
+            self.elapsed = 0.0;
+            self.worst = 0.0;
+            self.slow = 0;
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn debug_text(
     keys: Res<ButtonInput<KeyCode>>,
@@ -190,30 +226,41 @@ fn debug_text(
     cfg: Res<crate::base::debug::DebugConfig>,
     diag: Res<DiagnosticsStore>,
     render: Res<crate::base::render_scale::RenderInfo>,
+    real: Res<Time<Real>>,
+    mut stats: Local<FrameStats>,
     player: Query<(&Transform, &Player)>,
     mut text: Query<&mut Text, With<DebugText>>,
 ) {
     if keys.just_pressed(KeyCode::F3) {
         settings.show_fps = !settings.show_fps;
     }
-    show.0 = settings.show_fps;
+    if show.0 != settings.show_fps {
+        show.0 = settings.show_fps;
+    }
+    stats.record(real.delta_secs() * 1000.0);
     let fps = diag
         .get(&FrameTimeDiagnosticsPlugin::FPS)
         .and_then(|d| d.smoothed())
         .unwrap_or(0.0);
     let Ok((tf, p)) = player.single() else { return };
+    let want = if show.0 || cfg.active {
+        format!(
+            "{fps:.0} FPS | max {:.1} ms, {} lang | {}  pos {:.1} {:.1} {:.1}  yaw {:.0}",
+            stats.shown.0,
+            stats.shown.1,
+            render.label(),
+            tf.translation.x,
+            tf.translation.y,
+            tf.translation.z,
+            p.yaw.to_degrees()
+        )
+    } else {
+        String::new()
+    };
+    // Nur bei Änderung schreiben: jede Schreibung stößt das Layout des Textes neu an
     for mut t in text.iter_mut() {
-        t.0 = if show.0 || cfg.active {
-            format!(
-                "{fps:.0} FPS | {}  pos {:.1} {:.1} {:.1}  yaw {:.0}",
-                render.label(),
-                tf.translation.x,
-                tf.translation.y,
-                tf.translation.z,
-                p.yaw.to_degrees()
-            )
-        } else {
-            String::new()
-        };
+        if t.0 != want {
+            t.0.clone_from(&want);
+        }
     }
 }
