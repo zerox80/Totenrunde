@@ -10,20 +10,25 @@ use crate::world::nav::NavGrid;
 #[derive(Resource, Default)]
 pub struct FlowTimer(f32);
 
+/// Frühestens nach dieser Zeit (s) wird das Flow-Field neu berechnet.
+const FLOW_INTERVAL: f32 = 0.2;
+
+/// Das Flow-Field wird nur neu berechnet, wenn sich die Startzellen der Spieler geändert haben
+/// (oder eine Tür aufging): Bei stehenden Spielern käme dasselbe Feld heraus, und die
+/// Berechnung kostet im Browser (ein Thread) bei 160 Hz einen ganzen Bildschirmtakt.
 pub fn update_flow(
     time: Res<Time>,
     mut timer: ResMut<FlowTimer>,
     mut nav: ResMut<NavGrid>,
     survivors: Res<Survivors>,
 ) {
-    timer.0 -= time.delta_secs();
+    timer.0 = (timer.0 - time.delta_secs()).max(0.0);
+    if timer.0 > 0.0 && !nav.goal_cells.is_empty() {
+        return;
+    }
     let goals = survivors.goals();
-    let moved = goals
-        .iter()
-        .map(|g| nav.index_of(*g))
-        .any(|cell| cell.is_some() && !nav.goal_cells.contains(&cell.unwrap_or(usize::MAX)));
-    if timer.0 <= 0.0 || nav.goal_cells.is_empty() || (moved && timer.0 < 0.15) {
-        timer.0 = 0.25;
+    if nav.flow_is_stale(&goals) {
+        timer.0 = FLOW_INTERVAL;
         nav.compute_flow(&goals);
     }
 }

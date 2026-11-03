@@ -4,15 +4,16 @@
 //! Flow-Field (8 Nachbarn) von allen Spielern aus wird regelmäßig neu berechnet; jeder
 //! Zombie folgt dem fallenden Distanzwert und läuft so zum nächsten Spieler.
 
-use std::cmp::Reverse;
-use std::collections::BinaryHeap;
-
 use bevy::prelude::*;
 
 use super::collision::{CollisionWorld, F_ZOMBIE};
 use super::mapdata::MapFile;
 
 pub const UNREACHABLE: u32 = u32::MAX;
+
+/// Teuerste Kante im Gitter (Diagonale); die Eimer-Warteschlange braucht einen Eimer mehr.
+const MAX_STEP_COST: u32 = 14;
+const BUCKETS: usize = MAX_STEP_COST as usize + 1;
 
 #[derive(Resource)]
 pub struct NavGrid {
@@ -29,7 +30,8 @@ pub struct NavGrid {
     pub zone_of: Vec<i8>,
     /// Zielzellen des aktuellen Flow-Fields (leer: neu berechnen)
     pub goal_cells: Vec<usize>,
-    heap: BinaryHeap<Reverse<(u32, u32)>>,
+    /// Eimer nach Distanz (modulo `BUCKETS`), wiederverwendet statt pro Berechnung neu angelegt
+    buckets: Vec<Vec<u32>>,
 }
 
 impl NavGrid {
@@ -102,7 +104,7 @@ impl NavGrid {
             dist: vec![UNREACHABLE; n],
             zone_of,
             goal_cells: Vec::new(),
-            heap: BinaryHeap::new(),
+            buckets: vec![Vec::new(); BUCKETS],
         }
     }
 
@@ -174,20 +176,44 @@ impl NavGrid {
         None
     }
 
-    /// Berechnet das Flow-Field zu den Zielen (Spielerpositionen) neu.
-    pub fn compute_flow(&mut self, goals: &[Vec3]) {
-        let starts: Vec<usize> = goals
+    /// Startzellen des Flow-Fields für diese Ziele (sortiert, ohne Doppelte).
+    fn start_cells(&self, goals: &[Vec3]) -> Vec<usize> {
+        let mut starts: Vec<usize> = goals
             .iter()
             .filter_map(|g| self.nearest_walkable(*g))
             .collect();
+        starts.sort_unstable();
+        starts.dedup();
+        starts
+    }
+
+    /// Liefert `compute_flow` für diese Ziele ein anderes Ergebnis als bei der letzten
+    /// Berechnung? Das Feld hängt nur von den Startzellen und den offenen Türen ab (`open_door`
+    /// leert `goal_cells`); bei gleichen Startzellen wäre eine Neuberechnung bit-gleich.
+    pub fn flow_is_stale(&self, goals: &[Vec3]) -> bool {
+        self.goal_cells.is_empty() || self.start_cells(goals) != self.goal_cells
+    }
+
+    /// Berechnet das Flow-Field zu den Zielen (Spielerpositionen) neu.
+    ///
+    /// Dijkstra mit Eimer-Warteschlange (Dial): Die Kantenkosten sind ganze Zahlen von höchstens
+    /// 14, also reichen `BUCKETS` Eimer im Kreis, und es gibt weder Heap noch Vergleiche. Im
+    /// Browser läuft das im Hauptthread, dort zählt jede Millisekunde pro Bild.
+    pub fn compute_flow(&mut self, goals: &[Vec3]) {
+        let starts = self.start_cells(goals);
         if starts.is_empty() {
             return;
         }
         self.dist.fill(UNREACHABLE);
-        self.heap.clear();
+        for bucket in &mut self.buckets {
+            bucket.clear();
+        }
+        // Einträge in den Eimern, die noch nicht abgearbeitet sind (auch veraltete)
+        let mut pending = 0usize;
         for &start in &starts {
             self.dist[start] = 0;
-            self.heap.push(Reverse((0, start as u32)));
+            self.buckets[0].push(start as u32);
+            pending += 1;
         }
         self.goal_cells = starts;
         let w = self.w as i32;
@@ -197,42 +223,54 @@ impl NavGrid {
             (-1, 0, 10),
             (0, 1, 10),
             (0, -1, 10),
-            (1, 1, 14),
-            (1, -1, 14),
-            (-1, 1, 14),
-            (-1, -1, 14),
+            (1, 1, MAX_STEP_COST),
+            (1, -1, MAX_STEP_COST),
+            (-1, 1, MAX_STEP_COST),
+            (-1, -1, MAX_STEP_COST),
         ];
-        while let Some(Reverse((d, i))) = self.heap.pop() {
-            let i = i as usize;
-            if d > self.dist[i] {
-                continue;
-            }
-            let x = (i % self.w) as i32;
-            let y = (i / self.w) as i32;
-            for &(dx, dy, cost) in &N {
-                let nx = x + dx;
-                let ny = y + dy;
-                if nx < 0 || ny < 0 || nx >= w || ny >= h {
+        let mut d = 0u32;
+        while pending > 0 {
+            let slot = d as usize % BUCKETS;
+            // Neue Einträge landen wegen der Mindestkosten 10 nie im selben Eimer
+            let mut bucket = std::mem::take(&mut self.buckets[slot]);
+            pending -= bucket.len();
+            for &i in &bucket {
+                let i = i as usize;
+                if self.dist[i] != d {
+                    // veraltet: die Zelle wurde inzwischen über einen kürzeren Weg erreicht
                     continue;
                 }
-                let ni = (ny * w + nx) as usize;
-                if !self.walk[ni] {
-                    continue;
-                }
-                if dx != 0 && dy != 0 {
-                    // keine Ecken schneiden
-                    let a = (y * w + nx) as usize;
-                    let b = (ny * w + x) as usize;
-                    if !self.walk[a] || !self.walk[b] {
+                let x = (i % self.w) as i32;
+                let y = (i / self.w) as i32;
+                for &(dx, dy, cost) in &N {
+                    let nx = x + dx;
+                    let ny = y + dy;
+                    if nx < 0 || ny < 0 || nx >= w || ny >= h {
                         continue;
                     }
-                }
-                let nd = d + cost;
-                if nd < self.dist[ni] {
-                    self.dist[ni] = nd;
-                    self.heap.push(Reverse((nd, ni as u32)));
+                    let ni = (ny * w + nx) as usize;
+                    if !self.walk[ni] {
+                        continue;
+                    }
+                    if dx != 0 && dy != 0 {
+                        // keine Ecken schneiden
+                        let a = (y * w + nx) as usize;
+                        let b = (ny * w + x) as usize;
+                        if !self.walk[a] || !self.walk[b] {
+                            continue;
+                        }
+                    }
+                    let nd = d + cost;
+                    if nd < self.dist[ni] {
+                        self.dist[ni] = nd;
+                        self.buckets[nd as usize % BUCKETS].push(ni as u32);
+                        pending += 1;
+                    }
                 }
             }
+            bucket.clear();
+            self.buckets[slot] = bucket;
+            d += 1;
         }
     }
 

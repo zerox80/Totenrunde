@@ -184,6 +184,15 @@ impl Sfx {
         }
     }
 
+    /// Beiläufige Geräusche, die bei vielen gleichzeitigen Stimmen ausfallen dürfen
+    pub fn droppable(self) -> bool {
+        use Sfx::*;
+        matches!(
+            self,
+            Step | Shell | ZombieGroan | Impact | HitFlesh | GrenadeBounce
+        )
+    }
+
     /// Leichte Tonhöhen-Variation für natürlichere Wiederholungen
     pub fn pitch_jitter(self) -> f32 {
         use Sfx::*;
