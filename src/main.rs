@@ -36,7 +36,8 @@ use bevy::window::{PresentMode, WindowResolution};
 fn main() {
     #[cfg(target_arch = "wasm32")]
     console_error_panic_hook::set_once();
-    base::i18n::set(&base::settings::Settings::load().language);
+    let settings = base::settings::Settings::load();
+    base::i18n::set(&settings.language);
     base::platform::install_crash_handler();
     if !base::platform::check_assets() {
         return;
@@ -57,6 +58,22 @@ fn main() {
         ..window
     };
     let mut app = App::new();
+    // Im Browser lädt der AssetReader sonst immer die volle 2048er-Datei, obwohl die
+    // Laufzeit sie für die gewählte Grafikstufe sofort herunterrechnet. Vorab erzeugte
+    // Varianten (backend/optimize-textures.py) sparen Download, Dekodierung und Ruckler.
+    #[cfg(target_arch = "wasm32")]
+    if matches!(option_env!("TR_TEXTURE_VARIANTS"), Some("1")) {
+        use bevy::asset::io::{AssetSourceBuilder, AssetSourceBuilders, AssetSourceId};
+        let texture_max = settings.texture_max;
+        let mut builders = AssetSourceBuilders::default();
+        builders.insert(
+            AssetSourceId::Default,
+            AssetSourceBuilder::new(move || {
+                Box::new(base::assets::VariantAssetReader::new("assets", texture_max))
+            }),
+        );
+        app.insert_resource(builders);
+    }
     app.add_plugins(
         DefaultPlugins
             .set(WindowPlugin {

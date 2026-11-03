@@ -71,6 +71,14 @@ Vorausgesetzt werden Rust, OpenSSL, das Wasm-Ziel, `wasm-bindgen-cli` in exakt d
 
 Es entstehen zwei Builds: WebGL2 (`totenrunde`) und WebGPU (`totenrunde_webgpu`, Feature `webgpu`). Bevy kann nicht beides in einem Build. `backend/web/main.js` nimmt WebGPU, wenn der Browser dafür einen echten Grafikadapter liefert, sonst WebGL2; stürzt WebGPU beim Start ab, lädt die Seite mit WebGL2 neu. Mit `?renderer=webgl2` oder `?renderer=webgpu` lässt sich die Wahl erzwingen.
 
+Für die Auslieferung die Texturvarianten erzeugen und den Wasm-Build mit `TR_TEXTURE_VARIANTS=1` übersetzen. Der Docker-Build erledigt beides automatisch und komprimiert dort zusätzlich die Originale neu. Ohne die Variable lädt der Browser die Originale; fehlt mit ihr eine Variante, fällt er für diese Textur auf das Original zurück (funktioniert, ist aber größer und langsamer). Die erzeugten Ordner `assets/textures/<größe>/` sind von Git und Docker ausgenommen:
+
+```sh
+python3 -m pip install -r backend/optimize-textures.requirements.txt
+python3 backend/optimize-textures.py --root assets --sizes 512 1024
+export TR_TEXTURE_VARIANTS=1
+```
+
 ```sh
 rustup target add wasm32-unknown-unknown
 cargo install wasm-bindgen-cli --version 0.2.129 --locked

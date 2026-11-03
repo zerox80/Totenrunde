@@ -39,5 +39,8 @@ coverage/
 Thumbs.db
 desktop.ini
 
+# Erzeugte Texturvarianten (backend/optimize-textures.py)
+assets/textures/[0-9]*/
+
 # Lokale Multiplayer-Datenbank (Entwicklung)
 backend/data/

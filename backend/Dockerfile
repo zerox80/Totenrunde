@@ -7,6 +7,8 @@ RUN sh /tmp/install-binaryen.sh \
 COPY Cargo.toml Cargo.lock build.rs ./
 COPY src ./src
 COPY assets/maps/endstation.json ./assets/maps/endstation.json
+# Der Browser lädt damit vorab verkleinerte Texturen statt der 2048er-Originale.
+ENV TR_TEXTURE_VARIANTS=1
 # Zwei Builds: WebGPU für moderne Browser, WebGL2 als Rückfall; main.js wählt beim Laden.
 RUN cargo build --release --locked --target wasm32-unknown-unknown --bin totenrunde \
     && wasm-bindgen --target web --out-name totenrunde \
@@ -17,6 +19,16 @@ RUN cargo build --release --locked --target wasm32-unknown-unknown --bin totenru
     && wasm-bindgen --target web --out-name totenrunde_webgpu \
         --out-dir /web/pkg target/webgpu/wasm32-unknown-unknown/release/totenrunde.wasm \
     && wasm-opt -Oz /web/pkg/totenrunde_webgpu_bg.wasm -o /web/pkg/totenrunde_webgpu_bg.wasm
+
+# Verkleinerte Texturvarianten (512/1024) und verlustfreie Rekompression der Originale.
+# Der Browser lädt danach nur die Auflösung, die die Grafikstufe wirklich anzeigt.
+FROM python:3.13-slim AS asset-optimizer
+WORKDIR /build
+COPY backend/optimize-textures.requirements.txt ./
+RUN pip install --no-cache-dir --quiet -r optimize-textures.requirements.txt
+COPY assets ./assets
+COPY backend/optimize-textures.py backend/texture-golden.json ./
+RUN python3 optimize-textures.py --root assets --sizes 512 1024 --recompress-originals
 
 FROM rust:1.97-bookworm AS backend-builder
 WORKDIR /build/backend
@@ -35,7 +47,7 @@ WORKDIR /app
 COPY --from=backend-builder --chown=app:app /build/backend/target/release/totenrunde-web /app/totenrunde-web
 COPY --from=wasm-builder --chown=app:app /web/pkg /app/web/pkg
 COPY --chown=app:app backend/web/ /app/web/
-COPY --chown=app:app assets/ /app/assets/
+COPY --from=asset-optimizer --chown=app:app /build/assets/ /app/assets/
 COPY --chown=app:app LICENSE /app/LICENSE
 USER app
 # Konten und Statistik (SQLite) liegen in /data, das als Volume erhalten bleibt

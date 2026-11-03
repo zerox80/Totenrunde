@@ -10,6 +10,7 @@ third_party
 tools
 packaging
 dist
+assets/textures/[0-9]*
 .env
 .env.local
 .env.*.local

@@ -5,6 +5,7 @@ use std::path::Path;
 fn main() {
     println!("cargo:rerun-if-changed=packaging/totenrunde.ico");
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-env-changed=TR_TEXTURE_VARIANTS");
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
     }
