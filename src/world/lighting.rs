@@ -173,8 +173,17 @@ fn light_cones(
             .get(c.light)
             .map(|l| l.intensity / c.base.max(1.0))
             .unwrap_or(0.0);
-        if let Some(mut mat) = mats.get_mut(&m.0) {
-            let v = c.color * c.strength * k;
+        let v = c.color * c.strength * k;
+        // Erst lesen, nur bei Änderung schreiben: get_mut markiert das Material als geändert,
+        // und der Renderer baut es dann in jedem Bild neu auf (22 Kegel, auch bei konstantem
+        // Licht). Unsichtbar kleine Änderungen des Flackerns werden übersprungen.
+        let differs = mats.get(&m.0).is_some_and(|mat| {
+            let now = mat.base_color.to_linear();
+            (now.red - v.x).abs() > 1e-4
+                || (now.green - v.y).abs() > 1e-4
+                || (now.blue - v.z).abs() > 1e-4
+        });
+        if differs && let Some(mut mat) = mats.get_mut(&m.0) {
             mat.base_color = Color::linear_rgb(v.x, v.y, v.z);
         }
     }
