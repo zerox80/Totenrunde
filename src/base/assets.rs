@@ -1,6 +1,6 @@
 //! Zentrale Asset-Handles und Ladezustand.
 
-use bevy::asset::LoadState;
+use bevy::asset::{LoadState, RecursiveDependencyLoadState};
 use bevy::pbr::Lightmap;
 use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
@@ -54,7 +54,7 @@ pub struct GameAssets {
     pub weapons: Vec<Handle<Gltf>>,
     /// Modelle, die sonst erst mitten im Spiel geladen würden (Perks, Power-ups, Verstärker,
     /// Wandwaffen). Im Browser würde das Dekodieren und Mipmaps-Bauen den Hauptthread
-    /// blockieren – genau die kurzen Ruckler beim ersten Auftauchen.
+    /// blockieren – genau die kurzen Ruckler beim ersten Auftauchen. Nur dort befüllt.
     pub preload: Vec<Handle<Gltf>>,
     pub planks: Handle<Image>,
     pub font_bold: Handle<Font>,
@@ -97,29 +97,14 @@ fn load_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
         .filter(|p| crate::world::mapdata::asset_exists(p))
         .map(|p| asset_server.load(p))
         .collect();
-    let mut preload = Vec::new();
-    for w in crate::weapons::WEAPONS {
-        preload.push(asset_server.load(w.model()));
-    }
-    for perk in crate::game::perks::Perk::ALL {
-        preload.push(asset_server.load(perk.model()));
-    }
-    for kind in crate::game::powerups::PowerupKind::ALL {
-        preload.push(asset_server.load(kind.model()));
-    }
-    for path in [
-        "models/weapons/knife.gltf",
-        "models/weapons/perk_bottle.gltf",
-        "models/pap.gltf",
-        "models/power_switch.gltf",
-        "models/mystery_box.gltf",
-        "models/mystery_box_lid.gltf",
-        "models/teddy.gltf",
-    ] {
-        if crate::world::mapdata::asset_exists(path) {
-            preload.push(asset_server.load(path));
-        }
-    }
+    let preload = if cfg!(target_arch = "wasm32") {
+        web_preload_paths()
+            .into_iter()
+            .map(|p| asset_server.load(p))
+            .collect()
+    } else {
+        Vec::new()
+    };
     commands.insert_resource(GameAssets {
         zombies,
         weapons,
@@ -131,6 +116,32 @@ fn load_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
     });
 }
 
+/// Modelle, die der Browser zusätzlich zu Zombies und Kistenwaffen vorab lädt.
+fn web_preload_paths() -> Vec<String> {
+    use crate::game::{perks::Perk, powerups::PowerupKind};
+    let box_weapons: Vec<usize> = crate::game::interact::mystery_box::box_weapons().collect();
+    crate::weapons::WEAPONS
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !box_weapons.contains(i))
+        .map(|(_, w)| w.model())
+        .chain(Perk::ALL.map(Perk::model))
+        .chain(PowerupKind::ALL.map(|kind| kind.model().to_string()))
+        .chain(
+            [
+                "models/weapons/knife.gltf",
+                "models/weapons/perk_bottle.gltf",
+                "models/pap.gltf",
+                "models/power_switch.gltf",
+                "models/mystery_box.gltf",
+                "models/mystery_box_lid.gltf",
+                "models/teddy.gltf",
+            ]
+            .map(String::from),
+        )
+        .collect()
+}
+
 fn check_loaded(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -139,14 +150,31 @@ fn check_loaded(
     mut graphs: ResMut<Assets<AnimationGraph>>,
     state: Res<State<AppState>>,
 ) {
-    if assets
-        .zombies
-        .iter()
-        .chain(&assets.weapons)
-        .chain(&assets.preload)
-        .any(|z| !asset_server.is_loaded_with_dependencies(z))
-    {
+    let handles = || {
+        assets
+            .zombies
+            .iter()
+            .chain(&assets.weapons)
+            .chain(&assets.preload)
+    };
+    // Ein fehlgeschlagener Ladevorgang darf den Ladebildschirm nicht für immer blockieren
+    // (ein Netzwerkfehler im Browser genügt): Das Spiel läuft ohne dieses Modell weiter.
+    let load_state = |h: &Handle<Gltf>| asset_server.get_recursive_dependency_load_state(h.id());
+    if handles().any(|h| {
+        matches!(
+            load_state(h),
+            Some(RecursiveDependencyLoadState::NotLoaded | RecursiveDependencyLoadState::Loading)
+        )
+    }) {
         return;
+    }
+    for handle in handles() {
+        if let Some(RecursiveDependencyLoadState::Failed(error)) = load_state(handle) {
+            warn!(
+                "Asset {:?} nicht vollständig geladen: {error}",
+                handle.path()
+            );
+        }
     }
     let names = [
         "Idle",
@@ -163,6 +191,12 @@ fn check_loaded(
     ];
     let mut models = Vec::new();
     for handle in &assets.zombies {
+        if matches!(
+            asset_server.get_load_state(handle.id()),
+            Some(LoadState::Failed(_))
+        ) {
+            continue;
+        }
         let Some(z) = gltfs.get(handle) else { return };
         let clips: Vec<Handle<AnimationClip>> = names
             .iter()
@@ -262,7 +296,7 @@ fn track_textures(
 /// AssetReader sonst die Originaldatei, obwohl die Laufzeit sie gleich wieder
 /// herunterrechnet. Lightmaps bleiben unangetastet, ab 2048 wird das Original geladen.
 #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
-pub fn texture_variant(path: &str, texture_max: u32) -> Option<String> {
+fn texture_variant(path: &str, texture_max: u32) -> Option<String> {
     let size = match texture_max {
         0..=512 => "512",
         513..=1024 => "1024",
@@ -274,6 +308,73 @@ pub fn texture_variant(path: &str, texture_max: u32) -> Option<String> {
         return None;
     }
     Some(format!("{prefix}textures/{size}/{rest}"))
+}
+
+/// Lädt Texturen aus den Varianten-Ordnern und fällt auf das Original zurück, wenn eine
+/// Variante auf dem Server fehlt (Wasm-Build und ausgelieferte Assets passen nicht zusammen).
+#[cfg(target_arch = "wasm32")]
+pub struct VariantAssetReader {
+    variants: bevy::asset::io::wasm::HttpWasmAssetReader,
+    originals: bevy::asset::io::wasm::HttpWasmAssetReader,
+    texture_max: u32,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl VariantAssetReader {
+    pub fn new(root: &str, texture_max: u32) -> Self {
+        use bevy::asset::io::wasm::HttpWasmAssetReader;
+        use std::borrow::Cow;
+        Self {
+            variants: HttpWasmAssetReader::new(root).with_request_mapper(move |path| {
+                texture_variant(path, texture_max).map_or(Cow::Borrowed(path), Cow::Owned)
+            }),
+            originals: HttpWasmAssetReader::new(root),
+            texture_max,
+        }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl bevy::asset::io::AssetReader for VariantAssetReader {
+    async fn read<'a>(
+        &'a self,
+        path: &'a std::path::Path,
+    ) -> Result<impl bevy::asset::io::Reader + 'a, bevy::asset::io::AssetReaderError> {
+        use bevy::asset::io::AssetReaderError;
+        if path
+            .to_str()
+            .is_some_and(|p| texture_variant(p, self.texture_max).is_some())
+        {
+            match self.variants.read(path).await {
+                Err(AssetReaderError::NotFound(missing)) => {
+                    warn!("Texturvariante {missing:?} fehlt, lade das Original");
+                }
+                result => return result,
+            }
+        }
+        self.originals.read(path).await
+    }
+
+    async fn read_meta<'a>(
+        &'a self,
+        path: &'a std::path::Path,
+    ) -> Result<impl bevy::asset::io::Reader + 'a, bevy::asset::io::AssetReaderError> {
+        self.originals.read_meta(path).await
+    }
+
+    async fn read_directory<'a>(
+        &'a self,
+        path: &'a std::path::Path,
+    ) -> Result<Box<bevy::asset::io::PathStream>, bevy::asset::io::AssetReaderError> {
+        self.originals.read_directory(path).await
+    }
+
+    async fn is_directory<'a>(
+        &'a self,
+        path: &'a std::path::Path,
+    ) -> Result<bool, bevy::asset::io::AssetReaderError> {
+        self.originals.is_directory(path).await
+    }
 }
 
 #[cfg(test)]

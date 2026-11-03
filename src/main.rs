@@ -62,23 +62,14 @@ fn main() {
     // Laufzeit sie für die gewählte Grafikstufe sofort herunterrechnet. Vorab erzeugte
     // Varianten (backend/optimize-textures.py) sparen Download, Dekodierung und Ruckler.
     #[cfg(target_arch = "wasm32")]
-    if option_env!("TR_TEXTURE_VARIANTS").is_some() {
-        use bevy::asset::io::{
-            AssetSourceBuilder, AssetSourceBuilders, AssetSourceId, wasm::HttpWasmAssetReader,
-        };
+    if matches!(option_env!("TR_TEXTURE_VARIANTS"), Some("1")) {
+        use bevy::asset::io::{AssetSourceBuilder, AssetSourceBuilders, AssetSourceId};
         let texture_max = settings.texture_max;
         let mut builders = AssetSourceBuilders::default();
         builders.insert(
             AssetSourceId::Default,
             AssetSourceBuilder::new(move || {
-                Box::new(
-                    HttpWasmAssetReader::new("assets").with_request_mapper(move |path| {
-                        match base::assets::texture_variant(path, texture_max) {
-                            Some(variant) => std::borrow::Cow::Owned(variant),
-                            None => std::borrow::Cow::Borrowed(path),
-                        }
-                    }),
-                )
+                Box::new(base::assets::VariantAssetReader::new("assets", texture_max))
             }),
         );
         app.insert_resource(builders);

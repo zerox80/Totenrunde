@@ -23,10 +23,11 @@ RUN cargo build --release --locked --target wasm32-unknown-unknown --bin totenru
 # Verkleinerte Texturvarianten (512/1024) und verlustfreie Rekompression der Originale.
 # Der Browser lädt danach nur die Auflösung, die die Grafikstufe wirklich anzeigt.
 FROM python:3.13-slim AS asset-optimizer
-RUN pip install --no-cache-dir --quiet numpy pillow
 WORKDIR /build
+COPY backend/optimize-textures.requirements.txt ./
+RUN pip install --no-cache-dir --quiet -r optimize-textures.requirements.txt
 COPY assets ./assets
-COPY backend/optimize-textures.py ./
+COPY backend/optimize-textures.py backend/texture-golden.json ./
 RUN python3 optimize-textures.py --root assets --sizes 512 1024 --recompress-originals
 
 FROM rust:1.97-bookworm AS backend-builder

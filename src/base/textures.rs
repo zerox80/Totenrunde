@@ -216,7 +216,35 @@ fn downsample(cur: &[u8], cw: usize, ch: usize, conv: &SrgbConv) -> (Vec<u8>, us
 
 #[cfg(test)]
 mod tests {
-    use super::SrgbConv;
+    use super::{SrgbConv, halve};
+
+    /// backend/optimize-textures.py muss exakt dasselbe Ergebnis liefern; es prüft dieselben
+    /// Prüfsummen aus backend/texture-golden.json bei jedem Lauf.
+    #[test]
+    fn downscale_matches_web_texture_tool() {
+        let golden: serde_json::Value =
+            serde_json::from_str(include_str!("../../backend/texture-golden.json")).unwrap();
+        let size = golden["size"].as_u64().unwrap() as usize;
+        let target = golden["target"].as_u64().unwrap() as usize;
+        let mut pattern = Vec::with_capacity(size * size * 4);
+        for y in 0..size {
+            for x in 0..size {
+                for c in 0..4 {
+                    pattern.push(((x * 37 + y * 101 + c * 59 + (x * y) % 7) % 256) as u8);
+                }
+            }
+        }
+        for (kind, srgb) in [("srgb", true), ("linear", false)] {
+            let (mut image, mut w, mut h) = (pattern.clone(), size, size);
+            while w > target || h > target {
+                (image, w, h) = halve(&image, w, h, srgb);
+            }
+            let hash = image.iter().fold(0x811C_9DC5_u32, |value, &byte| {
+                (value ^ byte as u32).wrapping_mul(0x0100_0193)
+            });
+            assert_eq!(u64::from(hash), golden[kind].as_u64().unwrap(), "{kind}");
+        }
+    }
 
     /// Bisherige Rundung mit `powf` als Referenz für die Tabellen-Variante.
     fn reference(v: f32) -> u8 {
